@@ -133,7 +133,49 @@ contract EnergyTrading {
     }
 
     function buyEnergyFrom(address _seller, uint _requestedEnergy) external {
-        // Your implementation here
+        // A function for a registered prosumer in deficit to buy energy from a
+        // registered prosumer in surplus at the latest energy price. The requested
+        // energy is a positive value. The prosumer in deficit can only buy up to
+        // its recorded deficit energy.
+        require(_requestedEnergy > 0, "Requested energy must be > 0");
+        require(_seller != address(0), "Invalid seller");
+        require(_seller != msg.sender, "Cannot buy from self");
+
+        Prosumer storage buyer = prosumers[msg.sender];
+        Prosumer storage seller = prosumers[_seller];
+
+        require(buyer.isMember, "Buyer not registered");
+        require(seller.isMember, "Seller not registered");
+
+        // Buyer must be in deficit (negative)
+        require(buyer.prosumerEnergyStat < 0, "Buyer is not in deficit");
+
+        // Seller must be in surplus (positive)
+        require(seller.prosumerEnergyStat > 0, "Seller is not in surplus");
+
+        // Buyer can only buy up to its deficit
+        uint256 buyerDeficit = uint256(-buyer.prosumerEnergyStat); // safe because buyerEnergyStat < 0
+        require(_requestedEnergy <= buyerDeficit, "Requested energy exceeds buyer deficit");
+
+        // Seller must have enough surplus
+        uint256 sellerSurplus = uint256(seller.prosumerEnergyStat); // safe because > 0
+        require(_requestedEnergy <= sellerSurplus, "Requested energy exceeds seller surplus");
+
+        // Cost = units * price (price is wei per unit - perhaps need to standardise to whole ether?)
+        // does the update energy price need to be called first?
+        uint256 cost = _requestedEnergy * energyPrice;
+        require(buyer.prosumerBalance >= cost, "Insufficient buyer balance");
+
+        // internal settlement
+        buyer.prosumerBalance -= cost;
+        seller.prosumerBalance += cost;
+
+        // Update energy stats
+        buyer.prosumerEnergyStat += int256(_requestedEnergy);
+        seller.prosumerEnergyStat -= int256(_requestedEnergy);
+
+        // emit EnergyBought(msg.sender, _seller, _requestedEnergy, energyPrice, cost);
+        
     }
 
     function sellEnergyTo(address _buyer, uint _offeredEnergy) external {
