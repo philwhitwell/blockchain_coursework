@@ -34,7 +34,6 @@ contract EnergyTrading {
     constructor(address _recorder) payable {
         recorder=_recorder;
         energyPrice= 1 ether;
-
     }
 
     function registerProsumer() external {
@@ -99,16 +98,16 @@ contract EnergyTrading {
             // Calculate the total energy status of the community
         int256 total = 0;
 
-    // 1) sum community energy status
+        // sum community energy status
         for (uint256 i = 0; i < prosumerAddresses.length; i++) {
             address a = prosumerAddresses[i];
             total += prosumers[a].prosumerEnergyStat;
         }
 
-        // 2) start from base price = 1 ether
+        // start from base price = 1 ether
         uint256 price = 1 ether;
 
-        // 3) adjustment = |total| * 0.001 ether
+        // adjustment = |total| * 0.001 ether
         uint256 adjustment;
         if (total < 0) {
             adjustment = uint256(-total) * 0.001 ether; // deficit => increase
@@ -123,7 +122,7 @@ contract EnergyTrading {
             }
         }
 
-        // 4) cap price: [0.1 ether, 5 ether]
+        // cap price up to 0.1 ether and down tp  5 ether]
         if (price < 0.1 ether) price = 0.1 ether;
         if (price > 5 ether)   price = 5 ether;
 
@@ -227,14 +226,106 @@ contract EnergyTrading {
 
 
     function coordinateTrading() public {
-        // Your implementation here
+        //First loop through all the prosumers and create an array of buyers and of sellers
+        //Then sort sellers and buyers from biggest defecit and surplus to smallest
+        //Then loop until 
+        uint256 n = prosumerAddresses.length;
+
+        // Build sellers/buyers lists in memory.  Memory is cheaper gas, faster, auto-deleted after function than storage arrays
+        address[] memory sellers = new address[](n);
+        uint256[] memory sellerAmt = new uint256[](n);
+        uint256 sellersCount = 0;
+
+        address[] memory buyers = new address[](n);
+        uint256[] memory buyerAmt = new uint256[](n);
+        uint256 buyersCount = 0;
+
+        for (uint256 i = 0; i < n; i++) {
+            address a = prosumerAddresses[i];
+            int256 e = prosumers[a].prosumerEnergyStat;
+
+            if (e > 0) {
+                sellers[sellersCount] = a;
+                sellerAmt[sellersCount] = uint256(e);
+                sellersCount++;
+            } else if (e < 0) {
+                buyers[buyersCount] = a;
+                buyerAmt[buyersCount] = uint256(-e); 
+                buyersCount++;
+            }
+        }
+
+        // Sort sellers by surplus big to little
+        for (uint256 i = 0; i + 1 < sellersCount; i++) {
+            uint256 maxIdx = i;
+            for (uint256 j = i + 1; j < sellersCount; j++) {
+                if (sellerAmt[j] > sellerAmt[maxIdx]) maxIdx = j;
+            }
+            if (maxIdx != i) {
+                //address tempSeller = sellers[i];
+                //sellers[i] = sellers[maxIdx];
+                //sellers[maxIdx] = tempSeller;  
+                //https://docs.soliditylang.org/en/latest/control-structures.html#destructuring-assignments-and-returning-multiple-values helps to save on the gas
+                (sellers[i], sellers[maxIdx]) = (sellers[maxIdx], sellers[i]);
+                (sellerAmt[i], sellerAmt[maxIdx]) = (sellerAmt[maxIdx], sellerAmt[i]);
+            }
+        }
+
+        // Sort buyers by deficit big to little
+        for (uint256 i = 0; i + 1 < buyersCount; i++) {
+            uint256 maxIdx = i;
+            for (uint256 j = i + 1; j < buyersCount; j++) {
+                if (buyerAmt[j] > buyerAmt[maxIdx]) maxIdx = j;
+            }
+            if (maxIdx != i) {
+                (buyers[i], buyers[maxIdx]) = (buyers[maxIdx], buyers[i]);
+                (buyerAmt[i], buyerAmt[maxIdx]) = (buyerAmt[maxIdx], buyerAmt[i]);
+            }
+        }
+
+        // Match with two pointers
+        uint256 si = 0;
+        uint256 bi = 0;
+        uint256 totalMatched = 0;
+
+        while (si < sellersCount && bi < buyersCount) {
+        //keep looping whilst there are buyers and sellers
+        //PW not sure if this is right, feel like we should be able to break earlier in some situations and save some gas
+            //https://docs.soliditylang.org/en/latest/types.html#operators
+            //condition ? value_if_true : value_if_false; 
+            uint256 trade = sellerAmt[si] < buyerAmt[bi] ? sellerAmt[si] : buyerAmt[bi];
+
+            if (trade == 0) break;
+
+            address seller = sellers[si];
+            address buyer  = buyers[bi];
+
+            uint256 cost = trade * energyPrice;
+
+            // PDF says assume buyers have enough ETH, but worth a check
+            require(prosumers[buyer].prosumerBalance >= cost, "Buyer lacks money (ETH)");
+
+            // Exchange money
+            prosumers[buyer].prosumerBalance -= cost;
+            prosumers[seller].prosumerBalance += cost;
+
+            // Exchange energy stats
+            prosumers[buyer].prosumerEnergyStat += int256(trade);
+            prosumers[seller].prosumerEnergyStat -= int256(trade);
+
+            totalMatched += trade;
+
+            // Decrease remaining amounts in memory arrays
+            sellerAmt[si] -= trade;
+            buyerAmt[bi] -= trade;
+
+            if (sellerAmt[si] == 0) si++;
+            if (buyerAmt[bi] == 0) bi++;
+        }
+
+        emit CoordinationComplete(totalMatched);
     }
-    //delete later -ONLY FOR TESTING
-    function contractBalance() external view returns (uint256) {
-        // testing delete later
-        return address(this).balance;
-    }
-    ///DELETE ABOVE
+
 
     // -------------------------------------
     // Public view functions, do not modify

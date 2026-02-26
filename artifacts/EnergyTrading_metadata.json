@@ -253,7 +253,7 @@
 	},
 	"settings": {
 		"compilationTarget": {
-			"contracts/contract_template.sol": "EnergyTrading"
+			"contracts/Mustafa-Adaoglu+Phil-Whitwell-Contract.sol": "EnergyTrading"
 		},
 		"evmVersion": "prague",
 		"libraries": {},
@@ -267,7 +267,7 @@
 		"remappings": []
 	},
 	"sources": {
-		"contracts/contract_template.sol": {
+		"contracts/Mustafa-Adaoglu+Phil-Whitwell-Contract.sol": {
 			"keccak256": "0x4b11f2c02d92c11a29d4f6db1e3157016eff44b9c83baa9698d52f04e40a4fd6",
 			"license": "GPL-3.0",
 			"urls": [
