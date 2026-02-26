@@ -179,7 +179,50 @@ contract EnergyTrading {
     }
 
     function sellEnergyTo(address _buyer, uint _offeredEnergy) external {
-        // Your implementation here
+        // A function for a registered prosumer in surplus to sell energy to a
+        // registered prosumer in deficit at the latest energy price. The offered
+        // energy is a positive value. The prosumer in surplus can only sell up to
+        // its recorded surplus energy
+        //so much copied from above, perhaps an internal function that refactors both buy and sell?
+        require(_offeredEnergy > 0, "Offered energy must be > 0");
+        require(_buyer != address(0), "Invalid buyer");
+        require(_buyer != msg.sender, "Cannot sell to self");
+
+        Prosumer storage seller = prosumers[msg.sender];
+        Prosumer storage buyer  = prosumers[_buyer];
+
+        require(seller.isMember, "Seller not registered");
+        require(buyer.isMember, "Buyer not registered");
+
+        // Seller must be in surplus (positive)
+        require(seller.prosumerEnergyStat > 0, "Seller is not in surplus");
+
+        // Buyer must be in deficit (negative)
+        require(buyer.prosumerEnergyStat < 0, "Buyer is not in deficit");
+
+        // Seller can only sell up to its surplus
+        uint256 sellerSurplus = uint256(seller.prosumerEnergyStat);
+        require(_offeredEnergy <= sellerSurplus, "Offered exceeds seller surplus");
+
+        // Buyer can only buy up to its deficit
+        uint256 buyerDeficit = uint256(-buyer.prosumerEnergyStat);
+        require(_offeredEnergy <= buyerDeficit, "Offered exceeds buyer deficit");
+
+        // Total cost in wei
+        uint256 cost = _offeredEnergy * energyPrice;
+
+        // Buyer must have enough deposited balance to pay
+        require(buyer.prosumerBalance >= cost, "Insufficient buyer balance");
+
+        // internal settlement
+        buyer.prosumerBalance -= cost;
+        seller.prosumerBalance += cost;
+
+        // Update energy stats
+        seller.prosumerEnergyStat -= int256(_offeredEnergy);
+        buyer.prosumerEnergyStat  += int256(_offeredEnergy);
+
+        //emit EnergyTransaction ? single event shared?
     }
 
 
@@ -191,8 +234,8 @@ contract EnergyTrading {
         // testing delete later
         return address(this).balance;
     }
-
     ///DELETE ABOVE
+
     // -------------------------------------
     // Public view functions, do not modify
     // -------------------------------------
