@@ -31,6 +31,12 @@ contract EnergyTrading {
     address[] public prosumerAddresses;
     event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
 
+    modifier onlyRecorder() {
+        require(msg.sender == recorder, "Only recorder");
+        _;
+    }
+    //---PW
+
     constructor(address _recorder) payable {
         recorder=_recorder;
         energyPrice= 1 ether;
@@ -56,27 +62,37 @@ contract EnergyTrading {
         // smart contract.
         //PW Check that value is greater than 0? and do we need an event to log all deposits
         require(prosumers[msg.sender].isMember, "Prosumer not registered");
+        require(msg.value>0,"0 or negative value deposited, did you want to withdraw?");
         prosumers[msg.sender].prosumerBalance += msg.value;
     }
 
     function withdraw(uint256 _value) external {
-        // A function to enable a registered prosumer to withdraw Ethers from
-        // the smart contract. Prosumers can only withdraw Ethers if they have
+        // A function to enable a registered prosumer to withdraw Ethers from the smart contract. Prosumers can only withdraw Ethers if they have
         // no energy deficit.
-        address mySender=msg.sender;
-        require(prosumers[mySender].isMember, "Prosumer not registered");
-        require(prosumers[mySender].prosumerEnergyStat >= 0,"Prosumer has an energy deficit" );
-        //need to check the balance as well?
-        prosumers[mySender].prosumerBalance = prosumers[mySender].prosumerBalance - _value;
+   
+        Prosumer storage p = prosumers[msg.sender];
+        require(p.isMember, "Prosumer not registered");
+        require(p.prosumerEnergyStat >= 0, "Prosumer has an energy deficit");
+        require(_value > 0, "Amount=0");
+        require(p.prosumerBalance >= _value, "Insufficient balance");
+
+        p.prosumerBalance -= _value;
+
+        //value is updated for Balance but nothing changes the sender's ether, perhaps something like...
+        // (bool ok, ) = msg.sender.call{value: _value}("");
+        // require(ok, "ETH transfer failed");
+
+
+
     }
 
     function updateEnergyStatus(address _prosumer, int256 deltaEnergy) external {
-        // A function used by the recorder to update the energy status of a regis-
-        // tered prosumer. The recorder provides two parameters: (1) the address
-        // of the prosumer and (2) a signed integer representing the net energy
-        // status. A positive value indicates that the prosumer has a surplus of
-        // energy, while a negative value indicates that the prosumer has a deficit,
-        // meaning it needs more energy than its locally generated energy.
+        // A function used by the recorder to update the energy status of a registered prosumer. The recorder provides two parameters: 
+        //(1) the address of the prosumer and 
+        //(2) a signed integer representing the net energy status. A positive value indicates that the prosumer has a surplus of
+        // energy, while a negative value indicates that the prosumer has a deficit, meaning it needs more energy than its locally generated energy.
+
+
         require(msg.sender == recorder, "Only recorder can update energy status");
         require(prosumers[_prosumer].isMember, "Prosumer not registered");
 
@@ -86,16 +102,18 @@ contract EnergyTrading {
         //e.g  emit EnergyStatusUpdated(_prosumer, deltaEnergy, p.prosumerEnergyStat);
     }
 
-    function updateEnergyPrice() public {
+    function updateEnergyPrice() public { //onlyRecorder {
         // A function to update the energy price based on the energy status of
         // the community. The calculation of the energy price is as follows:
-        // • When there is 0 energy surplus or deficit, the energy price is 1
-        // Ether per unit of energy.
-        // • Each unit of energy deficit increases the energy price by 0.001
-        // Ether. The highest energy price is capped at 5 Ether.
-        // • Each unit of energy surplus decreases the energy price by 0.001
-        // Ether. The lowest energy price is capped at 0.1 Ether.
-            // Calculate the total energy status of the community
+        // • When there is 0 energy surplus or deficit, the energy price is 1 Ether per unit of energy.
+        // • Each unit of energy deficit increases the energy price by 0.001 Ether. The highest energy price is capped at 5 Ether.
+        // • Each unit of energy surplus decreases the energy price by 0.001 Ether. The lowest energy price is capped at 0.1 Ether.
+        
+        
+        //PW If we cannot use the modifier
+        require(msg.sender == recorder, "Only recorder can update energy status");
+
+        // Calculate the total energy status of the community
         int256 total = 0;
 
         // sum community energy status
@@ -132,10 +150,9 @@ contract EnergyTrading {
     }
 
     function buyEnergyFrom(address _seller, uint _requestedEnergy) external {
-        // A function for a registered prosumer in deficit to buy energy from a
-        // registered prosumer in surplus at the latest energy price. The requested
-        // energy is a positive value. The prosumer in deficit can only buy up to
-        // its recorded deficit energy.
+        // A function for a registered prosumer in deficit to buy energy from a registered prosumer in surplus at the latest energy price. The requested
+        // energy is a positive value. The prosumer in deficit can only buy up to its recorded deficit energy.
+
         require(_requestedEnergy > 0, "Requested energy must be > 0");
         require(_seller != address(0), "Invalid seller");
         require(_seller != msg.sender, "Cannot buy from self");
@@ -178,11 +195,10 @@ contract EnergyTrading {
     }
 
     function sellEnergyTo(address _buyer, uint _offeredEnergy) external {
-        // A function for a registered prosumer in surplus to sell energy to a
-        // registered prosumer in deficit at the latest energy price. The offered
-        // energy is a positive value. The prosumer in surplus can only sell up to
-        // its recorded surplus energy
-        //so much copied from above, perhaps an internal function that refactors both buy and sell?
+        // A function for a registered prosumer in surplus to sell energy to a registered prosumer in deficit at the latest energy price. The offered
+        // energy is a positive value. The prosumer in surplus can only sell up to its recorded surplus energy
+
+        //PW so much copied from above, perhaps an internal function that refactors both buy and sell?
         require(_offeredEnergy > 0, "Offered energy must be > 0");
         require(_buyer != address(0), "Invalid buyer");
         require(_buyer != msg.sender, "Cannot sell to self");
@@ -228,7 +244,12 @@ contract EnergyTrading {
     function coordinateTrading() public {
         //First loop through all the prosumers and create an array of buyers and of sellers
         //Then sort sellers and buyers from biggest defecit and surplus to smallest
-        //Then loop until 
+        //Then loop until all trades completed
+        //PW use the withdraw and deposit functions to make trades?
+
+        //PW If we cannot use the modifier
+        require(msg.sender == recorder, "Only recorder can update energy status");
+
         uint256 n = prosumerAddresses.length;
 
         // Build sellers/buyers lists in memory.  Memory is cheaper gas, faster, auto-deleted after function than storage arrays
