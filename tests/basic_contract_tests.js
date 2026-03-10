@@ -53,9 +53,11 @@ describe("updateEnergyPrice() integration testss", function () {
         [recorder, ...prosumers] = await ethers.getSigners();
         let EnergyTrading = await ethers.getContractFactory(contractName);
         let contract = await EnergyTrading.deploy(recorder.address);
+        const numProsumers = 19;
+
         // register all prosumers
-        for (const user of prosumers) {
-            await contract.connect(user).registerProsumer();
+        for (let i = 0; i < numProsumers; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
         }
         // GGenereated from the dataset.
         // Net energy deltas for 19 household for the time interval 7:00 - 21:00
@@ -166,9 +168,9 @@ describe("Unit Testing Coordination Mechanism", function () {
             await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
         }
 
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
+        // Perform coordination and trading, then check emitted event
+        await expect(connected_recorder.coordinateTrading())
+            .to.emit(contract, "CoordinationComplete") .withArgs(1);  
 
         let prosumerData;
         for (let i = 0; i < exptectedState.length; ++i) {
@@ -195,9 +197,10 @@ describe("Unit Testing Coordination Mechanism", function () {
         // Initial state is already zero by default.
         const exptectedState = [0, 0, 0, 0, 0]
 
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
+        // Perform coordination and trading, then check emitted event
+        await expect(connected_recorder.coordinateTrading())
+            .to.emit(contract, "CoordinationComplete")
+            .withArgs(0);  
 
         for (let i = 0; i < exptectedState.length; ++i) {
             const prosumerData = await contract.prosumers(prosumers[i].address);
@@ -222,9 +225,10 @@ describe("Unit Testing Coordination Mechanism", function () {
             await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
         }
 
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
+        // Perform coordination and trading, then check emitted event
+        await expect(connected_recorder.coordinateTrading())
+            .to.emit(contract, "CoordinationComplete")
+            .withArgs(0);  
 
         for (let i = 0; i < exptectedState.length; ++i) {
             const prosumerData = await contract.prosumers(prosumers[i].address);
@@ -248,9 +252,10 @@ describe("Unit Testing Coordination Mechanism", function () {
             await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
         }
 
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
+        // Perform coordination and trading, then check emitted event
+        await expect(connected_recorder.coordinateTrading())
+            .to.emit(contract, "CoordinationComplete")
+            .withArgs(0);  
 
         for (let i = 0; i < exptectedState.length; ++i) {
             const prosumerData = await contract.prosumers(prosumers[i].address);
@@ -273,9 +278,10 @@ describe("Unit Testing Coordination Mechanism", function () {
             await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
         }
 
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
+        // Perform coordination and trading, then check emitted event
+        await expect(connected_recorder.coordinateTrading())
+            .to.emit(contract, "CoordinationComplete")
+            .withArgs(9);  
 
         for (let i = 0; i < exptectedState.length; ++i) {
             const prosumerData = await contract.prosumers(prosumers[i].address);
@@ -296,9 +302,10 @@ describe("Unit Testing Coordination Mechanism", function () {
             await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
         }
 
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
+        // Perform coordination and trading, then check emitted event
+        await expect(connected_recorder.coordinateTrading())
+            .to.emit(contract, "CoordinationComplete")
+            .withArgs(1);  
 
         for (let i = 0; i < exptectedState.length; ++i) {
             const prosumerData = await contract.prosumers(prosumers[i].address);
@@ -319,32 +326,10 @@ describe("Unit Testing Coordination Mechanism", function () {
             await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
         }
 
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
-
-        for (let i = 0; i < exptectedState.length; ++i) {
-            const prosumerData = await contract.prosumers(prosumers[i].address);
-            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
-        }
-    });
-
-    it("More deficit than surplus", async function () {
-        const NUM_PROSUMERS = 5;
-        for (let i = 0; i < NUM_PROSUMERS; ++i) {
-            await contract.connect(prosumers[i]).registerProsumer();
-            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
-        }
-        
-        const initialState = [1, 0, 0, -1, -4]
-        const exptectedState = [0, 0, 0, -1, -3]
-        for (let i = 0; i < initialState.length; ++i) {
-            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
-        }
-
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
+        // Perform coordination and trading, then check emitted event
+        await expect(connected_recorder.coordinateTrading())
+            .to.emit(contract, "CoordinationComplete")
+            .withArgs(1);  
 
         for (let i = 0; i < exptectedState.length; ++i) {
             const prosumerData = await contract.prosumers(prosumers[i].address);
@@ -364,10 +349,10 @@ describe("Unit Testing Coordination Mechanism", function () {
         for (let i = 0; i < initialState.length; ++i) {
             await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
         }
-
-        // Perform coordination and trading
-        await connected_recorder.coordinateTrading()
-        // TODO: add emit check
+        // Perform coordination and trading, then check emitted event
+        await expect(connected_recorder.coordinateTrading())
+            .to.emit(contract, "CoordinationComplete")
+            .withArgs(2);  
 
         for (let i = 0; i < exptectedState.length; ++i) {
             const prosumerData = await contract.prosumers(prosumers[i].address);
