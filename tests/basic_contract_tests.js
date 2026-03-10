@@ -49,11 +49,10 @@ describe("updateEnergyPrice() integration testss", function () {
         // Hardhat creates max 20 signers,
         // so 1 recorder, 19 prosumers.
         let prosumers;
-        let users = [
-            recorder, ...prosumers 
-        ] = await ethers.getSigners();
-        EnergyTrading = await ethers.getContractFactory(contractName);
-        contract = await EnergyTrading.deploy(recorder.address);
+        let recorder;
+        [recorder, ...prosumers] = await ethers.getSigners();
+        let EnergyTrading = await ethers.getContractFactory(contractName);
+        let contract = await EnergyTrading.deploy(recorder.address);
         // register all prosumers
         for (const user of prosumers) {
             await contract.connect(user).registerProsumer();
@@ -138,3 +137,241 @@ describe("updateEnergyPrice() integration testss", function () {
         }
     });
 })
+
+describe("Unit Testing Coordination Mechanism", function () {
+    const STARTING_ETHER = ethers.parseEther("500");
+    let EnergyTrading, contract,  recorder, connected_recorder, prosumers;
+
+    beforeEach(async function () {
+        [recorder, ...prosumers] = await ethers.getSigners();
+        EnergyTrading = await ethers.getContractFactory(contractName);
+        contract = await EnergyTrading.deploy(recorder.address);
+        connected_recorder = await contract.connect(recorder);
+    });
+
+    it("Basic case from assessment brief", async function () {
+        const NUM_PROSUMERS = 5;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            // From assignment brierf:
+            // For simplicity, you can assume when the coordination function is called, 
+            // all prosumers in deficit have enough Ethers to buy the energy they need at 
+            // the latest energy price. 
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+
+        const initialState = [-1, 0, 0, 1, 4]
+        const exptectedState = [0, 0, 0, 1, 3]
+        for (let i = 0; i < initialState.length; ++i) {
+            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
+        }
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        let prosumerData;
+        for (let i = 0; i < exptectedState.length; ++i) {
+            prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+        }
+
+        // Just a sanity check
+        // We expect prosumer1 to buy and prosumer 5 to sell
+        prosumerData = await contract.prosumers(prosumers[0].address);
+        expect(prosumerData.prosumerBalance).to.be.lessThan(STARTING_ETHER);
+        prosumerData = await contract.prosumers(prosumers[4].address);
+        expect(prosumerData.prosumerBalance).to.be.greaterThan(STARTING_ETHER);
+    });
+
+    it("All zeroes", async function () {
+        const NUM_PROSUMERS = 5;
+        // Register users and make sure they have more than enough balance.
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+
+        // Initial state is already zero by default.
+        const exptectedState = [0, 0, 0, 0, 0]
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        for (let i = 0; i < exptectedState.length; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+            
+            // Check that nothing is taken out of balance.
+            expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER );
+        }
+    });
+
+    it("No surplus, all deficit", async function () {
+        const NUM_PROSUMERS = 5;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+        
+        // No surplus so no trade
+        const initialState = [-5, -2, -10, -1, -3]
+        const exptectedState = [-5, -2, -10, -1, -3]
+        for (let i = 0; i < initialState.length; ++i) {
+            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
+        }
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        for (let i = 0; i < exptectedState.length; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+            // Check that nothing is taken out of balance.
+            expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER );
+        }
+    });
+
+    it("No deficit, all surplus", async function () {
+        const NUM_PROSUMERS = 5;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+        
+        // No surplus so no trade
+        const initialState = [5, 2, 10, 1, 3]
+        const exptectedState = [5, 2, 10, 1, 3]
+        for (let i = 0; i < initialState.length; ++i) {
+            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
+        }
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        for (let i = 0; i < exptectedState.length; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+            // Check that nothing is taken out of balance.
+            expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER );
+        }
+    });
+
+    it("Equailbrium (net zero)", async function () {
+        const NUM_PROSUMERS = 5;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+        
+        const initialState = [-4, -4, -1,  2, 7]
+        const exptectedState = [0, 0, 0, 0, 0]
+        for (let i = 0; i < initialState.length; ++i) {
+            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
+        }
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        for (let i = 0; i < exptectedState.length; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+        }
+    });
+
+    it("More surplus than deficit", async function () {
+        const NUM_PROSUMERS = 5;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+        
+        const initialState = [-1, 0, 0, 1, 4]
+        const exptectedState = [0, 0, 0, 1, 3]
+        for (let i = 0; i < initialState.length; ++i) {
+            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
+        }
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        for (let i = 0; i < exptectedState.length; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+        }
+    });
+
+     it("More deficit than surplus", async function () {
+        const NUM_PROSUMERS = 5;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+        
+        const initialState = [1, 0, 0, -1, -4]
+        const exptectedState = [0, 0, 0, -1, -3]
+        for (let i = 0; i < initialState.length; ++i) {
+            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
+        }
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        for (let i = 0; i < exptectedState.length; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+        }
+    });
+
+    it("More deficit than surplus", async function () {
+        const NUM_PROSUMERS = 5;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+        
+        const initialState = [1, 0, 0, -1, -4]
+        const exptectedState = [0, 0, 0, -1, -3]
+        for (let i = 0; i < initialState.length; ++i) {
+            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
+        }
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        for (let i = 0; i < exptectedState.length; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+        }
+    });
+
+    it("Check low variance requirment", async function () {
+        const NUM_PROSUMERS = 5;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+        
+        const initialState = [-2, 4, 4, 0, 0]
+        const exptectedState = [0, 3, 3, 0, 0]
+        for (let i = 0; i < initialState.length; ++i) {
+            await connected_recorder.updateEnergyStatus(prosumers[i].address, initialState[i]);
+        }
+
+        // Perform coordination and trading
+        await connected_recorder.coordinateTrading()
+        // TODO: add emit check
+
+        for (let i = 0; i < exptectedState.length; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
+        }
+    });
+});
