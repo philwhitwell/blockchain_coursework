@@ -360,3 +360,89 @@ describe("Unit Testing Coordination Mechanism", function () {
         }
     });
 });
+
+
+describe("Integration Testing Coordination Mechanism", function () {
+    it("Data for 6 households from 5/01/2013 7:00 - 18:00", async function () {
+        let recorder;
+        let prosumers;
+        [recorder, ...prosumers] = await ethers.getSigners();
+        let EnergyTrading = await ethers.getContractFactory(contractName);
+        let contract = await EnergyTrading.deploy(recorder.address);
+        let connectedRecorder = await contract.connect(recorder);
+
+        const STARTING_ETHER = ethers.parseEther("5000");
+        const NUM_PROSUMERS = 6;
+        for (let i = 0; i < NUM_PROSUMERS; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+        }
+
+        const hosueholdData = [
+            [-1, -1, -1, -1, -1, -1],
+            [-1, -1, 1, -1, -1, -1],
+            [-1, 1, 1, -1, -1, -1],
+            [1, 1, 1, -1, 1, -1],
+            [1, 1, 1, -1, 1, -1],
+            [1, 1, 1, -1, 1, -1],
+            [1, 1, 1, 1, 1, -1],
+            [2, 1, 1, 1, 1, -1],
+            [2, 1, 1, 1, 1, -1],
+            [2, 1, 1, 1, 1, -1],
+            [2, -2, 1, 1, 1, -2],
+            [2, -3, 1, 1, 1, -2],
+            [2, 1, 1, 1, 1, -1],
+            [2, -1, 1, 1, 1, -1],
+            [2, -1, 1, 1, 1, -1],
+            [2, -1, 1, 1, -1, -1],
+            [2, -1, 1, 1, 1, -1],
+            [2, -2, 1, 1, 1, -2],
+            [1, -1, 1, 1, 1, -2],
+            [1, -2, 1, 1, 1, -1],
+            [1, -2, 0, 1, -1, -1],
+            [1, -2, -1, 1, -1, -1],
+            [1, -2, -1, -1, -1, -2]
+        ];
+
+        const expected = [
+            [-2, -2, 0, -2, -2, -2],
+            [-3, -1, 1, -3, -3, -3],
+            [-1, 0, 1, -4, -2, -4],
+            [0, 1, 1, -4, -1, -5],
+            [1, 1, 1, -4, 0, -5],
+            [1, 1, 1, -2, 1, -4],
+            [2, 1, 1, 0, 1, -2],
+            [2, 2, 2, 1, 2, -1],
+            [3, 3, 3, 2, 3, -1],
+            [4, 1, 4, 3, 4, -2],
+            [5, -2, 4, 4, 5, -2],
+            [5, 1, 4, 5, 5, -1],
+            [6, 0, 5, 6, 6, -1],
+            [7, -1, 6, 7, 7, -1],
+            [8, -1, 7, 7, 6, -1],
+            [8, -1, 8, 8, 7, -1],
+            [9, -2, 8, 9, 8, -2],
+            [8, -1, 8, 9, 9, -2],
+            [8, -2, 9, 9, 9, -1],
+            [9, -2, 8, 9, 7, -1],
+            [8, -2, 7, 9, 6, -1],
+            [8, -2, 6, 6, 5, -2],
+            [5, 0, 5, 6, 5, 0]
+        ]
+
+        for (let i = 0; i < hosueholdData.length; ++i) {
+            // Update hosuehold net values and run the market.
+            for (let j = 0; j < hosueholdData[i].length; ++j) {
+                await connectedRecorder.updateEnergyStatus(prosumers[j].address, hosueholdData[i][j]);
+            }
+            // TODO: CHeck emitted event
+            await connectedRecorder.coordinateTrading();
+            
+            // Check against expected.
+            for (let k =0; k < expected[i].length; ++k) {
+                const prosumerData = await contract.prosumers(prosumers[k].address);
+                expect(prosumerData.prosumerEnergyStat).to.equal(expected[i][k]);
+            }
+        }
+    });
+});
