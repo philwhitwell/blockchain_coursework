@@ -446,3 +446,45 @@ describe("Integration Testing Coordination Mechanism", function () {
         }
     });
 });
+
+
+describe("Coordination Gas Consumption Estimate", function () {
+    it("Simulate 100 hsoueholds over 50 time intervals (100 x 100)", async function () {
+        const rows = 50;
+        const cols = 100;
+        const min = -500;
+        const max = 500;
+        const randomData = Array.from({ length: rows }, () =>
+        Array.from({ length: cols }, () => 
+            Math.floor(Math.random() * (max - min + 1)) + min
+        ));
+        
+        let prosumers;
+        let recorder;
+        [recorder, ...prosumers] = await ethers.getSigners();
+        let EnergyTrading = await ethers.getContractFactory(contractName);
+        let contract = await EnergyTrading.deploy(recorder.address);
+
+        // register all prosumers and make sure they have neough ether
+        const STARTING_ETHER = ethers.parseEther("10000");
+        for (const user of prosumers) {
+            await contract.connect(user).registerProsumer();
+            await contract.connect(user).deposit({ value: STARTING_ETHER});
+        }
+        
+        let connectedRecorder = await contract.connect(recorder);
+
+        let totalGas = 0n;
+        for (let i = 0; i < randomData.length; ++i) {
+            // Update hosuehold net values and run the market.
+            for (let j = 0; j < randomData[i].length; ++j) {
+                await connectedRecorder.updateEnergyStatus(prosumers[j].address, randomData[i][j]);
+            }
+            const tx = await connectedRecorder.coordinateTrading();
+            const receipt = await tx.wait();
+            totalGas += receipt.gasUsed;
+        }
+        let averageGas = totalGas / BigInt(randomData.length);
+        console.log(`Average gas consumed by coordination: ${averageGas.toString()}`);
+    });
+});
