@@ -239,14 +239,14 @@ contract EnergyTrading {
     }
 
 
-    function coordinateTrading() onlyRecorder public {
-        //First loop through all the prosumers and create an array of buyers and of sellers
-        //Then sort sellers and buyers from biggest defecit and surplus to smallest
-        //Then loop until all trades completed
-        //PW use the withdraw and deposit functions to make trades?
+function coordinateTrading() onlyRecorder public {
+    //First loop through all the prosumers and create an array of buyers and of sellers
+    //Then sort sellers and buyers from biggest defecit and surplus to smallest
+    //Then loop until all trades completed
+    //PW use the withdraw and deposit functions to make trades?
 
-        //PW If we cannot use the modifier
-           //require(msg.sender == recorder, "Only recorder can update energy status");
+    //PW If we cannot use the modifier
+    //require(msg.sender == recorder, "Only recorder can update energy status");
 
     uint256 n = prosumerAddresses.length;
 
@@ -298,58 +298,62 @@ contract EnergyTrading {
     }
 
     uint256 totalMatched = 0;
+    uint256 si = 0;
 
     // Process each buyer, spreading purchases across sellers
     for (uint256 bi = 0; bi < buyersCount; bi++) {
-        address buyer = buyers[bi];
 
-        while (buyerAmt[bi] > 0) {
-            bool matchedThisRound = false;
+        while (buyerAmt[bi] > 0 && si < sellersCount) {
 
-            // Always take 1 unit at a time from the current highest-surplus seller
-            for (uint256 si = 0; si < sellersCount; si++) {
-                if (sellerAmt[si] == 0) continue;
-
-                address seller = sellers[si];
-                uint256 cost = energyPrice; // 1 unit
-
-                require(prosumers[buyer].prosumerBalance >= cost, "Buyer lacks money (ETH)");
-
-                prosumers[buyer].prosumerBalance -= cost;
-                prosumers[seller].prosumerBalance += cost;
-
-                prosumers[buyer].prosumerEnergyStat += 1;
-                prosumers[seller].prosumerEnergyStat -= 1;
-
-                buyerAmt[bi] -= 1;
-                sellerAmt[si] -= 1;
-                totalMatched += 1;
-                matchedThisRound = true;
-
-                break;
+            if (sellerAmt[si] == 0) {
+                si++;
+                continue;
             }
 
-            if (!matchedThisRound) {
-                break; // no seller left with surplus
+            address buyer = buyers[bi];
+            address seller = sellers[si];
+
+            uint256 cost = energyPrice; // 1 unit
+
+            {
+                // scoped storage references to reduce stack usage
+                Prosumer storage buyerP = prosumers[buyer];
+                Prosumer storage sellerP = prosumers[seller];
+
+                require(buyerP.prosumerBalance >= cost, "Buyer lacks money (ETH)");
+
+                buyerP.prosumerBalance -= cost;
+                sellerP.prosumerBalance += cost;
+
+                buyerP.prosumerEnergyStat += 1;
+                sellerP.prosumerEnergyStat -= 1;
+            }
+
+            buyerAmt[bi] -= 1;
+            sellerAmt[si] -= 1;
+            totalMatched += 1;
+
+            if (sellerAmt[si] == 0) {
+                si++;
             }
 
             // Re-sort sellers after each 1-unit trade to keep variance low
-            for (uint256 i = 0; i + 1 < sellersCount; i++) {
-                uint256 maxIdx = i;
-                for (uint256 j = i + 1; j < sellersCount; j++) {
-                    if (sellerAmt[j] > sellerAmt[maxIdx]) maxIdx = j;
-                }
-                if (maxIdx != i) {
-                    (sellers[i], sellers[maxIdx]) = (sellers[maxIdx], sellers[i]);
-                    (sellerAmt[i], sellerAmt[maxIdx]) = (sellerAmt[maxIdx], sellerAmt[i]);
-                }
-            }
+            // (Removed for gas efficiency – replaced by pointer tracking above)
+            // for (uint256 i = 0; i + 1 < sellersCount; i++) {
+            //     uint256 maxIdx = i;
+            //     for (uint256 j = i + 1; j < sellersCount; j++) {
+            //         if (sellerAmt[j] > sellerAmt[maxIdx]) maxIdx = j;
+            //     }
+            //     if (maxIdx != i) {
+            //         (sellers[i], sellers[maxIdx]) = (sellers[maxIdx], sellers[i]);
+            //         (sellerAmt[i], sellerAmt[maxIdx]) = (sellerAmt[maxIdx], sellerAmt[i]);
+            //     }
+            // }
         }
     }
 
     emit CoordinationComplete(totalMatched);
-    }
-
+}
 
     // -------------------------------------
     // Public view functions, do not modify
