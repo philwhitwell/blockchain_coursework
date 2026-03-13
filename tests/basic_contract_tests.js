@@ -44,7 +44,7 @@ describe("EnergyTrading basic tests", function () {
     });
 });
 
-describe("updateEnergyPrice() integration test", function () {
+describe("updateEnergyPrice() integration testss", function () {
     it("Net Energy Prices for 12/12/2012 7:00 - 21:00", async function () {
         // Hardhat creates max 20 signers,
         // so 1 recorder, 19 prosumers.
@@ -361,7 +361,6 @@ describe("Unit Testing Coordination Mechanism", function () {
     });
 });
 
-
 describe("Integration Testing Coordination Mechanism", function () {
     it("Data for 6 households from 5/01/2013 7:00 - 18:00", async function () {
         let recorder;
@@ -440,9 +439,9 @@ describe("Integration Testing Coordination Mechanism", function () {
                 await connectedRecorder.updateEnergyStatus(prosumers[j].address, hosueholdData[i][j]);
             }
             // TODO: CHeck emitted event
-            await connectedRecorder.coordinateTrading()
-            .to.emit(contract, "CoordinationComplete")
-            .withArgs(expectyedEmtis[i]);    
+            await expect(connectedRecorder.coordinateTrading())
+                .to.emit(contract, "CoordinationComplete")
+                .withArgs(expectyedEmtis[i]);  
             
             // Check against expected.
             for (let k =0; k < expected[i].length; ++k) {
