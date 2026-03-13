@@ -298,47 +298,61 @@ function coordinateTrading() onlyRecorder public {
     }
 
     uint256 totalMatched = 0;
-    uint256 si = 0;
+    uint256 startSi = 0;
 
     // Process each buyer, spreading purchases across sellers
     for (uint256 bi = 0; bi < buyersCount; bi++) {
+        if (sellersCount == 0) break;
 
-        while (buyerAmt[bi] > 0 && si < sellersCount) {
+        uint256 si = startSi;
+        uint256 checked = 0;
 
-            if (sellerAmt[si] == 0) {
-                si++;
-                continue;
+        while (buyerAmt[bi] > 0) {
+            bool matchedThisRound = false;
+
+            // Always take 1 unit at a time, but rotate seller choice
+            while (checked < sellersCount) {
+                if (sellerAmt[si] > 0) {
+                    address buyer = buyers[bi];
+                    address seller = sellers[si];
+                    uint256 cost = energyPrice; // 1 unit
+
+                    {
+                        // scoped storage references to reduce stack usage
+                        Prosumer storage buyerP = prosumers[buyer];
+                        Prosumer storage sellerP = prosumers[seller];
+
+                        require(buyerP.prosumerBalance >= cost, "Buyer lacks money (ETH)");
+
+                        buyerP.prosumerBalance -= cost;
+                        sellerP.prosumerBalance += cost;
+
+                        buyerP.prosumerEnergyStat += 1;
+                        sellerP.prosumerEnergyStat -= 1;
+                    }
+
+                    buyerAmt[bi] -= 1;
+                    sellerAmt[si] -= 1;
+                    totalMatched += 1;
+                    matchedThisRound = true;
+
+                    // next seller starts after this one, to keep variance low
+                    startSi = (si + 1) % sellersCount;
+                    si = startSi;
+                    checked = 0;
+                    break;
+                }
+
+                si = (si + 1) % sellersCount;
+                checked++;
             }
 
-            address buyer = buyers[bi];
-            address seller = sellers[si];
-
-            uint256 cost = energyPrice; // 1 unit
-
-            {
-                // scoped storage references to reduce stack usage
-                Prosumer storage buyerP = prosumers[buyer];
-                Prosumer storage sellerP = prosumers[seller];
-
-                require(buyerP.prosumerBalance >= cost, "Buyer lacks money (ETH)");
-
-                buyerP.prosumerBalance -= cost;
-                sellerP.prosumerBalance += cost;
-
-                buyerP.prosumerEnergyStat += 1;
-                sellerP.prosumerEnergyStat -= 1;
-            }
-
-            buyerAmt[bi] -= 1;
-            sellerAmt[si] -= 1;
-            totalMatched += 1;
-
-            if (sellerAmt[si] == 0) {
-                si++;
+            if (!matchedThisRound) {
+                break; // no seller left with surplus
             }
 
             // Re-sort sellers after each 1-unit trade to keep variance low
-            // (Removed for gas efficiency – replaced by pointer tracking above)
+            // (Removed for gas efficiency – replaced by rotating seller pointer above)
             // for (uint256 i = 0; i + 1 < sellersCount; i++) {
             //     uint256 maxIdx = i;
             //     for (uint256 j = i + 1; j < sellersCount; j++) {
