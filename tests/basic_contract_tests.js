@@ -44,7 +44,7 @@ describe("EnergyTrading basic tests", function () {
     });
 });
 
-describe("updateEnergyPrice() integration testss", function () {
+describe("updateEnergyPrice() integration test", function () {
     it("Net Energy Prices for 12/12/2012 7:00 - 21:00", async function () {
         // Hardhat creates max 20 signers,
         // so 1 recorder, 19 prosumers.

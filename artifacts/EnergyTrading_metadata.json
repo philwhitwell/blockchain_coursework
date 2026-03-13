@@ -68,19 +68,6 @@
 			},
 			{
 				"inputs": [],
-				"name": "contractBalance",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
 				"name": "coordinateTrading",
 				"outputs": [],
 				"stateMutability": "nonpayable",
@@ -243,17 +230,13 @@
 		},
 		"userdoc": {
 			"kind": "user",
-			"methods": {
-				"getRecorder()": {
-					"notice": "DELETE ABOVE"
-				}
-			},
+			"methods": {},
 			"version": 1
 		}
 	},
 	"settings": {
 		"compilationTarget": {
-			"contracts/Mustafa-Adaoglu+Phil-Whitwell-Contract.sol": "EnergyTrading"
+			"contracts/EnergyTrading.sol": "EnergyTrading"
 		},
 		"evmVersion": "prague",
 		"libraries": {},
@@ -267,12 +250,12 @@
 		"remappings": []
 	},
 	"sources": {
-		"contracts/Mustafa-Adaoglu+Phil-Whitwell-Contract.sol": {
-			"keccak256": "0x4b11f2c02d92c11a29d4f6db1e3157016eff44b9c83baa9698d52f04e40a4fd6",
+		"contracts/EnergyTrading.sol": {
+			"keccak256": "0xec5b11fc207ba2c83bdd4344291efce9178ff95cc8748781d0dd3e61e32e4911",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://e08fedb509e6de2dfaaee92e3e0433d708c95fe715ff1b571b67b7590d0bc702",
-				"dweb:/ipfs/QmREQmYwghFLNc7J3Y6x1Ctp2vr48uB4pMjniJApvYAp31"
+				"bzz-raw://bd3dfbc0a1a9dbae50d0b9f48921bf5531c78baec6a7a55a539b87583706f6b7",
+				"dweb:/ipfs/QmPzgrwnQAkXpHAMSEstHDiyrBycUtAtUSsyn6iif3fLPZ"
 			]
 		}
 	},

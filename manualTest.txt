@@ -5,6 +5,9 @@ account 3   0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB	0	energy 0 ether 	No chan
 account 4   0x617F2E2fD72FD9D5503197092aC168c91465E7f2	1	energy 0 ether 	Seller
 account 5   0x17F6AD8Ef982297579C203069C1DbfFE4348c372	4	energy 0 ether 	Seller
 
+[const initialState = [-4, -4, -1,  2, 7]
+const exptectedState = [0, 0, 0, 0, 0]]
+
 RegisterProsumer Account[1] (seller) + Account[2] (buyer)
 
 Recorder UPDATEENERGYSTATUS sets seller +10, buyer -6
