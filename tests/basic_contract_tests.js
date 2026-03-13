@@ -405,30 +405,34 @@ describe("Integration Testing Coordination Mechanism", function () {
         ];
 
         const expected = [
-            [-2, -2, 0, -2, -2, -2],
-            [-3, -1, 1, -3, -3, -3],
-            [-1, 0, 1, -4, -2, -4],
-            [0, 1, 1, -4, -1, -5],
-            [1, 1, 1, -4, 0, -5],
-            [1, 1, 1, -2, 1, -4],
-            [2, 1, 1, 0, 1, -2],
-            [2, 2, 2, 1, 2, -1],
-            [3, 3, 3, 2, 3, -1],
-            [4, 1, 4, 3, 4, -2],
-            [5, -2, 4, 4, 5, -2],
-            [5, 1, 4, 5, 5, -1],
-            [6, 0, 5, 6, 6, -1],
-            [7, -1, 6, 7, 7, -1],
-            [8, -1, 7, 7, 6, -1],
-            [8, -1, 8, 8, 7, -1],
-            [9, -2, 8, 9, 8, -2],
-            [8, -1, 8, 9, 9, -2],
-            [8, -2, 9, 9, 9, -1],
-            [9, -2, 8, 9, 7, -1],
-            [8, -2, 7, 9, 6, -1],
-            [8, -2, 6, 6, 5, -2],
-            [5, 0, 5, 6, 5, 0]
-        ]
+            [-1, -1, -1, -1, -1, -1],
+            [-2, -2,  0, -2, -2, -2],
+            [-2, -1,  0, -3, -3, -3],
+            [-1,  0,  0, -3, -2, -4],
+            [ 0,  0,  0, -3, -1, -4],
+            [ 0,  0,  0, -3,  0, -3],
+            [ 0,  0,  0, -1,  0, -1],
+            [ 0,  1,  1,  0,  1,  0],
+            [ 1,  2,  2,  1,  2,  0],
+            [ 2,  3,  3,  2,  3,  0],
+            [ 3,  1,  3,  3,  4,  0],
+            [ 3,  0,  3,  4,  4,  0],
+            [ 4,  1,  4,  5,  5,  0],
+            [ 5,  0,  5,  6,  6,  0],
+            [ 6,  0,  6,  6,  7,  0],
+            [ 6,  0,  7,  7,  6,  0],
+            [ 7,  0,  7,  8,  7,  0],
+            [ 7,  0,  7,  8,  8,  0],
+            [ 7,  0,  8,  8,  8,  0],
+            [ 8,  0,  8,  8,  8,  0],
+            [ 7,  0,  8,  8,  7,  0],
+            [ 7,  0,  7,  7,  6,  0],
+            [ 5,  0,  5,  6,  5,  0]
+        ];
+
+        // This is the value expected to be emitted by event
+        // It should be the amount of total energy excahnged at end of coordiantion.
+        const expectyedEmtis = [0, 0, 1, 1, 2, 3, 4, 2, 1, 1, 2, 4, 1, 1, 2, 2, 2, 4, 3, 3, 3, 3, 4]
 
         for (let i = 0; i < hosueholdData.length; ++i) {
             // Update hosuehold net values and run the market.
@@ -436,7 +440,9 @@ describe("Integration Testing Coordination Mechanism", function () {
                 await connectedRecorder.updateEnergyStatus(prosumers[j].address, hosueholdData[i][j]);
             }
             // TODO: CHeck emitted event
-            await connectedRecorder.coordinateTrading();
+            await connectedRecorder.coordinateTrading()
+            .to.emit(contract, "CoordinationComplete")
+            .withArgs(expectyedEmtis[i]);    
             
             // Check against expected.
             for (let k =0; k < expected[i].length; ++k) {
