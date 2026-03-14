@@ -8,7 +8,6 @@ Your teammate's student ID: sc20m2a
 <!-- Example: Firstly, the function iterates through the students to get ...  -->
 
 ## Do you use any additional contract variables? If so, what is the purpose of each variable? (no more than 200 words):
-<!-- Example: I use the a uint256 variable called ... to keep track of ...  -->
 I use an array of addresses called prosumerAddresses as appears mappings are not iterable
 
 ## Do you use any additional data structures (structs)? If so, what is the purpose of each structure? (no more than 200 words):

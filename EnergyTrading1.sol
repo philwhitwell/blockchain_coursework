@@ -108,7 +108,7 @@ contract EnergyTrading {
         prosumers[_prosumer].prosumerEnergyStat += deltaEnergy;
 
         //probably should be using emit and recording the event
-        emit EnergyStatusUpdated(_prosumer, deltaEnergy, prosumers[_prosumer].prosumerEnergyStat);
+        //e.g  emit EnergyStatusUpdated(_prosumer, deltaEnergy, p.prosumerEnergyStat);
     }
 
     function updateEnergyPrice() onlyRecorder public { //onlyRecorder {
