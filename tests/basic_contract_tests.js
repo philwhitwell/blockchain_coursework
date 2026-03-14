@@ -32,6 +32,13 @@ describe("EnergyTrading basic tests", function () {
         expect(prosumerData.prosumerBalance).to.equal(ethers.parseEther("1"));
     });
 
+    it("Should allow a registered prosumer to deposit Ethers", async function () {
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit({ value: ethers.parseEther("1") });
+        const prosumerData = await contract.prosumers(prosumer1.address);
+        expect(prosumerData.prosumerBalance).to.equal(ethers.parseEther("1"));
+    });
+
     it("Should allow recorder to update energy status of prosumers", async function () {
         await contract.connect(prosumer1).registerProsumer();
         await contract.connect(prosumer2).registerProsumer();
