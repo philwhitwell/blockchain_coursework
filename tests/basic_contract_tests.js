@@ -454,13 +454,13 @@ describe("Integration Testing Coordination Mechanism", function () {
 
 
 describe("Coordination Gas Consumption Estimate", function () {
-    it("Simulate 100 hsoueholds over 50 time intervals (100 x 100)", async function () {
-        const rows = 50;
-        const cols = 100;
-        const min = -500;
-        const max = 500;
-        const randomData = Array.from({ length: rows }, () =>
-        Array.from({ length: cols }, () => 
+    it("Simulate 25 hsoueholds over 500 time intervals", async function () {
+        const timePeriods = 500;
+        const numHouseholds = 25;
+        const min = -200;
+        const max = 200;
+        const randomData = Array.from({ length: timePeriods }, () =>
+        Array.from({ length: numHouseholds }, () => 
             Math.floor(Math.random() * (max - min + 1)) + min
         ));
         
@@ -472,9 +472,9 @@ describe("Coordination Gas Consumption Estimate", function () {
 
         // register all prosumers and make sure they have neough ether
         const STARTING_ETHER = ethers.parseEther("10000");
-        for (const user of prosumers) {
-            await contract.connect(user).registerProsumer();
-            await contract.connect(user).deposit({ value: STARTING_ETHER});
+        for (let i = 0; i < numHouseholds; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
         }
         
         let connectedRecorder = await contract.connect(recorder);
