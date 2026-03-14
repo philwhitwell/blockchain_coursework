@@ -27,13 +27,14 @@ contract EnergyTrading {
     // event to emit when coordination is complete
     event CoordinationComplete(uint256 totalMatchedEnergy);
 
-    //PW Added as appears mappings are not iterable
-    address[] public prosumerAddresses;
+    //PW Variables added
+    address[] public prosumerAddresses; //Added as appears mappings are not iterable
     event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
     event ProsumerRegistered(address indexed prosumer);
     event Deposit(address indexed prosumer, uint256 amount);
     event Withdraw(address indexed prosumer, uint256 amount);
     event EnergyStatusUpdated(address indexed prosumer,int256 deltaEnergy,int256 newEnergyStatus);
+    event EnergyTraded(address indexed seller,address indexed buyer,uint256 energyAmount,uint256 unitPrice,uint256 totalCost);
 
     modifier onlyRecorder() {
         require(msg.sender == recorder, "Only recorder allowed");
@@ -41,6 +42,10 @@ contract EnergyTrading {
     }
     modifier isMember(){
         require(prosumers[msg.sender].isMember, "Prosumer not registered");
+        _;
+    }
+    modifier isRegistered(address prosumerAddr) {
+        require(prosumers[prosumerAddr].isMember, "Prosumer not registered");
         _;
     }
 
@@ -84,7 +89,7 @@ contract EnergyTrading {
         Prosumer storage p = prosumers[msg.sender];
         //added as modifier require(p.isMember, "Prosumer not registered");
         require(p.prosumerEnergyStat >= 0, "Cannot withdraw while in energy deficit");
-        require(_value > 0, "Amount=0");
+        require(_value > 0, "Amount must be greater than 0");
         require(p.prosumerBalance >= _value, "Insufficient balance");
 
         p.prosumerBalance -= _value;
@@ -95,23 +100,27 @@ contract EnergyTrading {
         emit Withdraw(msg.sender, _value);
     }
 
-    function updateEnergyStatus(address _prosumer, int256 deltaEnergy) onlyRecorder external {
+
+    function updateEnergyStatus(address _prosumer, int256 deltaEnergy)
+            external
+            onlyRecorder
+            isRegistered(_prosumer)
+        {
         // A function used by the recorder to update the energy status of a registered prosumer. The recorder provides two parameters: 
         //(1) the address of the prosumer and 
         //(2) a signed integer representing the net energy status. A positive value indicates that the prosumer has a surplus of
         // energy, while a negative value indicates that the prosumer has a deficit, meaning it needs more energy than its locally generated energy.
 
-
         //added as modfier require(msg.sender == recorder, "Only recorder can update energy status");
-        require(prosumers[_prosumer].isMember, "Prosumer not registered");
 
-        prosumers[_prosumer].prosumerEnergyStat += deltaEnergy;
+            Prosumer storage p = prosumers[_prosumer];
+            p.prosumerEnergyStat += deltaEnergy;
 
-        //probably should be using emit and recording the event
-        emit EnergyStatusUpdated(_prosumer, deltaEnergy, prosumers[_prosumer].prosumerEnergyStat);
-    }
+            emit EnergyStatusUpdated(_prosumer, deltaEnergy, p.prosumerEnergyStat);
+        }
 
-    function updateEnergyPrice() onlyRecorder public { //onlyRecorder {
+
+    function updateEnergyPrice() public onlyRecorder{ 
         // A function to update the energy price based on the energy status of
         // the community. The calculation of the energy price is as follows:
         // • When there is 0 energy surplus or deficit, the energy price is 1 Ether per unit of energy.
@@ -136,6 +145,7 @@ contract EnergyTrading {
 
         // adjustment = |total| * 0.001 ether
         uint256 adjustment;
+
         if (total < 0) {
             adjustment = uint256(-total) * 0.001 ether; // deficit => increase
             price = price + adjustment;
@@ -149,71 +159,23 @@ contract EnergyTrading {
             }
         }
 
-        // cap price up to 0.1 ether and down tp  5 ether]
+        // cap price between 0.1 ether and 5 ether
         if (price < 0.1 ether) price = 0.1 ether;
         if (price > 5 ether)   price = 5 ether;
 
         energyPrice = price;
 
-         emit EnergyPriceUpdated(price, total);
+        emit EnergyPriceUpdated(price, total);
     }
-
-    function buyEnergyFrom(address _seller, uint _requestedEnergy) external {
-        // A function for a registered prosumer in deficit to buy energy from a registered prosumer in surplus at the latest energy price. The requested
-        // energy is a positive value. The prosumer in deficit can only buy up to its recorded deficit energy.
-
-        require(_requestedEnergy > 0, "Requested energy must be > 0");
-        require(_seller != address(0), "Invalid seller");
-        require(_seller != msg.sender, "Cannot buy from self");
-
-        Prosumer storage buyer = prosumers[msg.sender];
+    function _executeTrade(address _seller, address _buyer, uint256 _energyAmount) internal {
+        //Internal function, as realised that buy and sell energy had a lot of repeated code
         Prosumer storage seller = prosumers[_seller];
-
-        require(buyer.isMember, "Buyer not registered");
-        require(seller.isMember, "Seller not registered");
-
-        // Buyer must be in deficit (negative)
-        require(buyer.prosumerEnergyStat < 0, "Buyer is not in deficit");
-
-        // Seller must be in surplus (positive)
-        require(seller.prosumerEnergyStat > 0, "Seller is not in surplus");
-
-        // Buyer can only buy up to its deficit
-        uint256 buyerDeficit = uint256(-buyer.prosumerEnergyStat); // safe because buyerEnergyStat < 0
-        require(_requestedEnergy <= buyerDeficit, "Requested energy exceeds buyer deficit");
-
-        // Seller must have enough surplus
-        uint256 sellerSurplus = uint256(seller.prosumerEnergyStat); // safe because > 0
-        require(_requestedEnergy <= sellerSurplus, "Requested energy exceeds seller surplus");
-
-        // Cost = units * price (price is wei per unit - perhaps need to standardise to whole ether?)
-        // does the update energy price need to be called first?
-        uint256 cost = _requestedEnergy * energyPrice;
-        require(buyer.prosumerBalance >= cost, "Insufficient buyer balance");
-
-        // internal settlement
-        buyer.prosumerBalance -= cost;
-        seller.prosumerBalance += cost;
-
-        // Update energy stats
-        buyer.prosumerEnergyStat += int256(_requestedEnergy);
-        seller.prosumerEnergyStat -= int256(_requestedEnergy);
-
-        // emit EnergyBought(msg.sender, _seller, _requestedEnergy, energyPrice, cost);
-        
-    }
-
-    function sellEnergyTo(address _buyer, uint _offeredEnergy) external {
-        // A function for a registered prosumer in surplus to sell energy to a registered prosumer in deficit at the latest energy price. The offered
-        // energy is a positive value. The prosumer in surplus can only sell up to its recorded surplus energy
-
-        //PW so much copied from above, perhaps an internal function that refactors both buy and sell?
-        require(_offeredEnergy > 0, "Offered energy must be > 0");
-        require(_buyer != address(0), "Invalid buyer");
-        require(_buyer != msg.sender, "Cannot sell to self");
-
-        Prosumer storage seller = prosumers[msg.sender];
         Prosumer storage buyer  = prosumers[_buyer];
+
+        require(_energyAmount > 0, "Energy amount must be > 0");
+        require(_seller != address(0), "Invalid seller");
+        require(_buyer != address(0), "Invalid buyer");
+        require(_seller != _buyer, "Cannot trade with self");
 
         require(seller.isMember, "Seller not registered");
         require(buyer.isMember, "Buyer not registered");
@@ -226,14 +188,14 @@ contract EnergyTrading {
 
         // Seller can only sell up to its surplus
         uint256 sellerSurplus = uint256(seller.prosumerEnergyStat);
-        require(_offeredEnergy <= sellerSurplus, "Offered exceeds seller surplus");
+        require(_energyAmount <= sellerSurplus, "Energy exceeds seller surplus");
 
         // Buyer can only buy up to its deficit
         uint256 buyerDeficit = uint256(-buyer.prosumerEnergyStat);
-        require(_offeredEnergy <= buyerDeficit, "Offered exceeds buyer deficit");
+        require(_energyAmount <= buyerDeficit, "Energy exceeds buyer deficit");
 
         // Total cost in wei
-        uint256 cost = _offeredEnergy * energyPrice;
+        uint256 cost = _energyAmount * energyPrice;
 
         // Buyer must have enough deposited balance to pay
         require(buyer.prosumerBalance >= cost, "Insufficient buyer balance");
@@ -243,141 +205,131 @@ contract EnergyTrading {
         seller.prosumerBalance += cost;
 
         // Update energy stats
-        seller.prosumerEnergyStat -= int256(_offeredEnergy);
-        buyer.prosumerEnergyStat  += int256(_offeredEnergy);
+        seller.prosumerEnergyStat -= int256(_energyAmount);
+        buyer.prosumerEnergyStat  += int256(_energyAmount);
 
-        //emit EnergyTransaction ? single event shared?
+        emit EnergyTraded(_seller, _buyer, _energyAmount, energyPrice, cost);
+}
+
+
+    function buyEnergyFrom(address _seller, uint256 _requestedEnergy) external isMember{
+        // A function for a registered prosumer in deficit to buy energy from a registered prosumer in surplus at the latest energy price. The requested
+        // energy is a positive value. The prosumer in deficit can only buy up to its recorded deficit energy.
+
+        require(_seller != msg.sender, "Cannot buy from self");
+
+        _executeTrade(_seller, msg.sender, _requestedEnergy);
+    }
+
+    function sellEnergyTo(address _buyer, uint256 _offeredEnergy) external isMember{
+        // A function for a registered prosumer in surplus to sell energy to a registered prosumer in deficit at the latest energy price. The offered
+        // energy is a positive value. The prosumer in surplus can only sell up to its recorded surplus energy
+
+        require(_buyer != msg.sender, "Cannot sell to self");
+
+        _executeTrade(msg.sender, _buyer, _offeredEnergy);
     }
 
 
-function coordinateTrading() onlyRecorder public {
-    //First loop through all the prosumers and create an array of buyers and of sellers
-    //Then sort sellers and buyers from biggest defecit and surplus to smallest
-    //Then loop until all trades completed
-    //PW use the withdraw and deposit functions to make trades?
+    function coordinateTrading() public onlyRecorder {
+    // First loop through all the prosumers and create an array of buyers and of sellers
+    // Then sort sellers and buyers from biggest deficit and surplus to smallest
+    // Then loop until all trades completed
+    // PW use the withdraw and deposit functions to make trades?
 
-    //PW If we cannot use the modifier
-    //require(msg.sender == recorder, "Only recorder can update energy status");
+        uint256 n = prosumerAddresses.length;
 
-    uint256 n = prosumerAddresses.length;
+        address[] memory sellers = new address[](n);
+        uint256[] memory sellerAmt = new uint256[](n);
+        uint256 sellersCount = 0;
 
-    address[] memory sellers = new address[](n);
-    uint256[] memory sellerAmt = new uint256[](n);
-    uint256 sellersCount = 0;
+        address[] memory buyers = new address[](n);
+        uint256[] memory buyerAmt = new uint256[](n);
+        uint256 buyersCount = 0;
 
-    address[] memory buyers = new address[](n);
-    uint256[] memory buyerAmt = new uint256[](n);
-    uint256 buyersCount = 0;
+        for (uint256 i = 0; i < n; i++) {
+            address a = prosumerAddresses[i];
+            int256 e = prosumers[a].prosumerEnergyStat;
 
-    for (uint256 i = 0; i < n; i++) {
-        address a = prosumerAddresses[i];
-        int256 e = prosumers[a].prosumerEnergyStat;
-
-        if (e > 0) {
-            sellers[sellersCount] = a;
-            sellerAmt[sellersCount] = uint256(e);
-            sellersCount++;
-        } else if (e < 0) {
-            buyers[buyersCount] = a;
-            buyerAmt[buyersCount] = uint256(-e);
-            buyersCount++;
+            if (e > 0) {
+                sellers[sellersCount] = a;
+                sellerAmt[sellersCount] = uint256(e);
+                sellersCount++;
+            } else if (e < 0) {
+                buyers[buyersCount] = a;
+                buyerAmt[buyersCount] = uint256(-e);
+                buyersCount++;
+            }
         }
-    }
 
-    // Sort sellers by surplus big to little
-    for (uint256 i = 0; i + 1 < sellersCount; i++) {
-        uint256 maxIdx = i;
-        for (uint256 j = i + 1; j < sellersCount; j++) {
-            if (sellerAmt[j] > sellerAmt[maxIdx]) maxIdx = j;
+        // Sort sellers by surplus big to little
+        for (uint256 i = 0; i + 1 < sellersCount; i++) {
+            uint256 maxIdx = i;
+            for (uint256 j = i + 1; j < sellersCount; j++) {
+                if (sellerAmt[j] > sellerAmt[maxIdx]) maxIdx = j;
+            }
+            if (maxIdx != i) {
+                (sellers[i], sellers[maxIdx]) = (sellers[maxIdx], sellers[i]);
+                (sellerAmt[i], sellerAmt[maxIdx]) = (sellerAmt[maxIdx], sellerAmt[i]);
+            }
         }
-        if (maxIdx != i) {
-            (sellers[i], sellers[maxIdx]) = (sellers[maxIdx], sellers[i]);
-            (sellerAmt[i], sellerAmt[maxIdx]) = (sellerAmt[maxIdx], sellerAmt[i]);
+
+        // Sort buyers by deficit big to little
+        for (uint256 i = 0; i + 1 < buyersCount; i++) {
+            uint256 maxIdx = i;
+            for (uint256 j = i + 1; j < buyersCount; j++) {
+                if (buyerAmt[j] > buyerAmt[maxIdx]) maxIdx = j;
+            }
+            if (maxIdx != i) {
+                (buyers[i], buyers[maxIdx]) = (buyers[maxIdx], buyers[i]);
+                (buyerAmt[i], buyerAmt[maxIdx]) = (buyerAmt[maxIdx], buyerAmt[i]);
+            }
         }
-    }
 
-    // Sort buyers by deficit big to little
-    for (uint256 i = 0; i + 1 < buyersCount; i++) {
-        uint256 maxIdx = i;
-        for (uint256 j = i + 1; j < buyersCount; j++) {
-            if (buyerAmt[j] > buyerAmt[maxIdx]) maxIdx = j;
-        }
-        if (maxIdx != i) {
-            (buyers[i], buyers[maxIdx]) = (buyers[maxIdx], buyers[i]);
-            (buyerAmt[i], buyerAmt[maxIdx]) = (buyerAmt[maxIdx], buyerAmt[i]);
-        }
-    }
+        uint256 totalMatched = 0;
 
-    uint256 totalMatched = 0;
-    uint256 startSi = 0;
+        // For each buyer, repeatedly buy 1 unit from the seller with the highest current surplus.
+        for (uint256 bi = 0; bi < buyersCount; bi++) {
+            address buyer = buyers[bi];
+            Prosumer storage buyerP = prosumers[buyer];
 
-    // Process each buyer, spreading purchases across sellers
-    for (uint256 bi = 0; bi < buyersCount; bi++) {
-        if (sellersCount == 0) break;
+            while (buyerAmt[bi] > 0) {
+                uint256 maxSellerIdx = type(uint256).max;
+                uint256 maxSurplus = 0;
 
-        uint256 si = startSi;
-        uint256 checked = 0;
-
-        while (buyerAmt[bi] > 0) {
-            bool matchedThisRound = false;
-
-            // Always take 1 unit at a time, but rotate seller choice
-            while (checked < sellersCount) {
-                if (sellerAmt[si] > 0) {
-                    address buyer = buyers[bi];
-                    address seller = sellers[si];
-                    uint256 cost = energyPrice; // 1 unit
-
-                    {
-                        // scoped storage references to reduce stack usage
-                        Prosumer storage buyerP = prosumers[buyer];
-                        Prosumer storage sellerP = prosumers[seller];
-
-                        require(buyerP.prosumerBalance >= cost, "Buyer lacks money (ETH)");
-
-                        buyerP.prosumerBalance -= cost;
-                        sellerP.prosumerBalance += cost;
-
-                        buyerP.prosumerEnergyStat += 1;
-                        sellerP.prosumerEnergyStat -= 1;
+                // Find seller with largest remaining surplus
+                for (uint256 si = 0; si < sellersCount; si++) {
+                    if (sellerAmt[si] > maxSurplus) {
+                        maxSurplus = sellerAmt[si];
+                        maxSellerIdx = si;
                     }
+                }
 
-                    buyerAmt[bi] -= 1;
-                    sellerAmt[si] -= 1;
-                    totalMatched += 1;
-                    matchedThisRound = true;
-
-                    // next seller starts after this one, to keep variance low
-                    startSi = (si + 1) % sellersCount;
-                    si = startSi;
-                    checked = 0;
+                // No seller left with surplus
+                if (maxSurplus == 0) {
                     break;
                 }
 
-                si = (si + 1) % sellersCount;
-                checked++;
-            }
+                address seller = sellers[maxSellerIdx];
+                Prosumer storage sellerP = prosumers[seller];
 
-            if (!matchedThisRound) {
-                break; // no seller left with surplus
-            }
+                uint256 cost = energyPrice; // 1 unit per step
 
-            // Re-sort sellers after each 1-unit trade to keep variance low
-            // (Removed for gas efficiency – replaced by rotating seller pointer above)
-            // for (uint256 i = 0; i + 1 < sellersCount; i++) {
-            //     uint256 maxIdx = i;
-            //     for (uint256 j = i + 1; j < sellersCount; j++) {
-            //         if (sellerAmt[j] > sellerAmt[maxIdx]) maxIdx = j;
-            //     }
-            //     if (maxIdx != i) {
-            //         (sellers[i], sellers[maxIdx]) = (sellers[maxIdx], sellers[i]);
-            //         (sellerAmt[i], sellerAmt[maxIdx]) = (sellerAmt[maxIdx], sellerAmt[i]);
-            //     }
-            // }
+                // The brief allows us to assume buyers have enough Ether
+                buyerP.prosumerBalance -= cost;
+                sellerP.prosumerBalance += cost;
+
+                buyerP.prosumerEnergyStat += 1;
+                sellerP.prosumerEnergyStat -= 1;
+
+                buyerAmt[bi] -= 1;
+                sellerAmt[maxSellerIdx] -= 1;
+                totalMatched += 1;
+            }
         }
+
+        emit CoordinationComplete(totalMatched);
     }
-    emit CoordinationComplete(totalMatched);
-}
 
     // -------------------------------------
     // Public view functions, do not modify
@@ -387,7 +339,7 @@ function coordinateTrading() onlyRecorder public {
         return recorder;
     }
 
-    function getEnergyPrice() public view returns (uint256) {
+    function getEnergyPrice() public view returns (uint256) {   
         return energyPrice;
     }
 }

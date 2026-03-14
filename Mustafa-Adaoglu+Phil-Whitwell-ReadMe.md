@@ -4,8 +4,8 @@ Your student ID: khzp0421
 Your teammate's name: Mustafa Adaoglu
 Your teammate's student ID: sc20m2a
 
-## Description of the proposed coordination mechanism implemented in the coordinatedExchange() function (no more than 200 words):
-<!-- Example: Firstly, the function iterates through the students to get ...  -->
+## Description of the proposed coordination mechanism implemented in the coordinatedTrading() function (no more than 200 words):
+At each step, the mechanism allocates one unit of energy from the seller with the largest current surplus to the buyer with the largest current deficit, repeating until no further trade is possible. This prioritizes minimizing unmatched energy while also reducing variance across prosumers.
 
 ## Do you use any additional contract variables? If so, what is the purpose of each variable? (no more than 200 words):
 I use an array of addresses called prosumerAddresses as appears mappings are not iterable
