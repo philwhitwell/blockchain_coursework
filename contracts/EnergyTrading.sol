@@ -331,6 +331,7 @@ contract EnergyTrading {
         emit CoordinationComplete(totalMatched);
     }
 
+    
     // -------------------------------------
     // Public view functions, do not modify
     // -------------------------------------
