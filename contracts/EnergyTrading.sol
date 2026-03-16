@@ -231,12 +231,12 @@ contract EnergyTrading {
     }
 
 
-    function coordinateTrading() public onlyRecorder {
+function coordinateTrading() public onlyRecorder {
     // First loop through all the prosumers and create an array of buyers and of sellers
     // Then sort sellers and buyers from biggest deficit and surplus to smallest
     // Then loop until all trades completed
     // PW use the withdraw and deposit functions to make trades?
-
+   
         uint256 n = prosumerAddresses.length;
 
         address[] memory sellers = new address[](n);
@@ -288,48 +288,69 @@ contract EnergyTrading {
 
         uint256 totalMatched = 0;
 
-        // For each buyer, repeatedly buy 1 unit from the seller with the highest current surplus.
-        for (uint256 bi = 0; bi < buyersCount; bi++) {
-            address buyer = buyers[bi];
+        //
+        // OLD behaviour filled one buyer completely before moving to the next
+        // This caused:
+        // [1,1,1,-5,0,-4] → [0,0,0,-2,0,-4]
+        //
+        // NEW behaviour matches ONE unit at a time, always selecting:
+        // - buyer with largest deficit
+        // - seller with largest surplus
+        // This produces:
+        // [1,1,1,-5,0,-4] → [0,0,0,-3,0,-3]
+
+        while (true) {
+
+            uint256 maxBuyerIdx = type(uint256).max;
+            uint256 maxDeficit = 0;
+
+            // Find buyer with largest remaining deficit
+            for (uint256 bi = 0; bi < buyersCount; bi++) {
+                if (buyerAmt[bi] > maxDeficit) {
+                    maxDeficit = buyerAmt[bi];
+                    maxBuyerIdx = bi;
+                }
+            }
+
+            uint256 maxSellerIdx = type(uint256).max;
+            uint256 maxSurplus = 0;
+
+            // Find seller with largest remaining surplus
+            for (uint256 si = 0; si < sellersCount; si++) {
+                if (sellerAmt[si] > maxSurplus) {
+                    maxSurplus = sellerAmt[si];
+                    maxSellerIdx = si;
+                }
+            }
+
+            // No buyers or sellers left
+            if (maxDeficit == 0 || maxSurplus == 0) {
+                break;
+            }
+
+            address buyer = buyers[maxBuyerIdx];
             Prosumer storage buyerP = prosumers[buyer];
 
-            while (buyerAmt[bi] > 0) {
-                uint256 maxSellerIdx = type(uint256).max;
-                uint256 maxSurplus = 0;
+            address seller = sellers[maxSellerIdx];
+            Prosumer storage sellerP = prosumers[seller];
 
-                // Find seller with largest remaining surplus
-                for (uint256 si = 0; si < sellersCount; si++) {
-                    if (sellerAmt[si] > maxSurplus) {
-                        maxSurplus = sellerAmt[si];
-                        maxSellerIdx = si;
-                    }
-                }
+            uint256 cost = energyPrice; // 1 unit per step
 
-                // No seller left with surplus
-                if (maxSurplus == 0) {
-                    break;
-                }
+            // The brief allows us to assume buyers have enough Ether
+            buyerP.prosumerBalance -= cost;
+            sellerP.prosumerBalance += cost;
 
-                address seller = sellers[maxSellerIdx];
-                Prosumer storage sellerP = prosumers[seller];
+            buyerP.prosumerEnergyStat += 1;
+            sellerP.prosumerEnergyStat -= 1;
 
-                uint256 cost = energyPrice; // 1 unit per step
+            buyerAmt[maxBuyerIdx] -= 1;
+            sellerAmt[maxSellerIdx] -= 1;
 
-                // The brief allows us to assume buyers have enough Ether
-                buyerP.prosumerBalance -= cost;
-                sellerP.prosumerBalance += cost;
-
-                buyerP.prosumerEnergyStat += 1;
-                sellerP.prosumerEnergyStat -= 1;
-
-                buyerAmt[bi] -= 1;
-                sellerAmt[maxSellerIdx] -= 1;
-                totalMatched += 1;
-            }
+            totalMatched += 1;
         }
 
         emit CoordinationComplete(totalMatched);
-    }
+}
 
     
     // -------------------------------------
