@@ -5,8 +5,16 @@ Your teammate's name: Mustafa Adaoglu
 Your teammate's student ID: sc20m2a
 
 ## Description of the proposed coordination mechanism implemented in the coordinatedTrading() function (no more than 200 words):
-The coordination mechanism repeatedly matches the prosumer with the largest energy deficit (buyer) with the prosumer holding the largest energy surplus (seller). Each trade transfers one unit of energy and the system re-evaluates all prosumers after every trade. This approach ensures that the most extreme surplus and deficit are always prioritised, which helps minimise the overall imbalance in the community. Performing trades one unit at a time also improves fairness in tie situations. 
-For example, starting from [-2, 4, 4, 0, 0], unit-by-unit re-evaluation produces [0, 3, 3, 0, 0], which distributes the reduction evenly across the two largest sellers. A batched approach could instead produce [0, 2, 4, 0, 0], which has higher variance and is therefore less balanced. Although batching could reduce gas consumption, the assignment prioritises balanced outcomes over gas efficiency, so the unit-by-unit coordination strategy was chosen.
+The coordinateTrading() function implements a simple coordination mechanism that redistributes surplus energy among prosumers in discrete trading steps. The function first iterates through all registered prosumers and separates them into two groups: sellers, who have positive energy surplus, and buyers, who have negative energy balance (energy deficit). Two arrays store the addresses of sellers and buyers together with the magnitude of their surplus or deficit.
+
+Both groups are then sorted in descending order so that the largest surplus sellers and largest deficit buyers are prioritised. The algorithm then repeatedly performs one-unit energy trades. In each iteration, the buyer with the largest remaining deficit and the seller with the largest remaining surplus are selected. One unit of energy is transferred by decreasing the seller’s energy status and increasing the buyer’s energy status, while the corresponding payment is transferred between their balances.
+
+This process continues until either no buyers have remaining deficit or no sellers have remaining surplus. The function tracks the total number of successful trades and emits the CoordinationComplete event with this value once coordination finishes.
+These two cases aided getting the sorting correct
+$$[1,1,1,-5,0,-4] -> [0,0,0,-3,0,-3]$$
+
+$$[8,-1,7,7,6,-1] -> [6,0,7,7,6,0]$$
+
 
 ## Do you use any additional contract variables? If so, what is the purpose of each variable? (no more than 200 words):
 An additional contract variable prosumerAddresses (an array of addresses) was introduced because Solidity mappings are not iterable. While the prosumers mapping stores the data associated with each prosumer, it is not possible to loop through all keys in a mapping. The prosumerAddresses array stores the address of every registered prosumer when they call registerProsumer(). This allows the contract to iterate over all participants when performing operations that require knowledge of the entire community, such as calculating the total community energy status in updateEnergyPrice() and identifying buyers and sellers during the coordinateTrading() process.

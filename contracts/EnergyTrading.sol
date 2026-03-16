@@ -230,13 +230,12 @@ contract EnergyTrading {
         _executeTrade(msg.sender, _buyer, _offeredEnergy);
     }
 
+    function coordinateTrading() public onlyRecorder {
+        // First loop through all the prosumers and create an array of buyers and of sellers
+        // Then sort sellers and buyers from biggest deficit and surplus to smallest
+        // Then loop until all trades completed
+        // PW use the withdraw and deposit functions to make trades?
 
-function coordinateTrading() public onlyRecorder {
-    // First loop through all the prosumers and create an array of buyers and of sellers
-    // Then sort sellers and buyers from biggest deficit and surplus to smallest
-    // Then loop until all trades completed
-    // PW use the withdraw and deposit functions to make trades?
-   
         uint256 n = prosumerAddresses.length;
 
         address[] memory sellers = new address[](n);
@@ -288,23 +287,24 @@ function coordinateTrading() public onlyRecorder {
 
         uint256 totalMatched = 0;
 
+        // Repeatedly trade ONE unit at a time.
+        // Each round:
+        // - choose buyer with largest remaining deficit
+        // - choose seller with largest remaining surplus
         //
-        // OLD behaviour filled one buyer completely before moving to the next
-        // This caused:
-        // [1,1,1,-5,0,-4] → [0,0,0,-2,0,-4]
+        // PW remember 
+        // Use ">" not ">=" in the scans below.
+        // That means if values are tied, the FIRST entry already in the sorted array is kept.
         //
-        // NEW behaviour matches ONE unit at a time, always selecting:
-        // - buyer with largest deficit
-        // - seller with largest surplus
-        // This produces:
-        // [1,1,1,-5,0,-4] → [0,0,0,-3,0,-3]
-
+        // This gives:
+        // [1,1,1,-5,0,-4] -> [0,0,0,-3,0,-3]
+        // [8,-1,7,7,6,-1] -> [6,0,7,7,6,0]
         while (true) {
-
             uint256 maxBuyerIdx = type(uint256).max;
             uint256 maxDeficit = 0;
 
             // Find buyer with largest remaining deficit
+            // IMPORTANT: use ">" not ">=" so ties keep the first buyer found
             for (uint256 bi = 0; bi < buyersCount; bi++) {
                 if (buyerAmt[bi] > maxDeficit) {
                     maxDeficit = buyerAmt[bi];
@@ -316,6 +316,7 @@ function coordinateTrading() public onlyRecorder {
             uint256 maxSurplus = 0;
 
             // Find seller with largest remaining surplus
+            // IMPORTANT: use ">" not ">=" so ties keep the first seller found
             for (uint256 si = 0; si < sellersCount; si++) {
                 if (sellerAmt[si] > maxSurplus) {
                     maxSurplus = sellerAmt[si];
@@ -323,7 +324,7 @@ function coordinateTrading() public onlyRecorder {
                 }
             }
 
-            // No buyers or sellers left
+            // No buyer left with deficit or no seller left with surplus
             if (maxDeficit == 0 || maxSurplus == 0) {
                 break;
             }
@@ -337,6 +338,8 @@ function coordinateTrading() public onlyRecorder {
             uint256 cost = energyPrice; // 1 unit per step
 
             // The brief allows us to assume buyers have enough Ether
+            require(buyerP.prosumerBalance >= cost, "Buyer has insufficient balance");
+
             buyerP.prosumerBalance -= cost;
             sellerP.prosumerBalance += cost;
 
@@ -345,12 +348,11 @@ function coordinateTrading() public onlyRecorder {
 
             buyerAmt[maxBuyerIdx] -= 1;
             sellerAmt[maxSellerIdx] -= 1;
-
             totalMatched += 1;
         }
 
         emit CoordinationComplete(totalMatched);
-}
+    }
 
     
     // -------------------------------------

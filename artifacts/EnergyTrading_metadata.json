@@ -364,11 +364,11 @@
 	},
 	"sources": {
 		"contracts/EnergyTrading.sol": {
-			"keccak256": "0x52459afb9f9ff32c88587f151f6381169de6e919eefea0da1d99dc3aebed665e",
+			"keccak256": "0xe731c2788e3a0a8706cad1900aa1961d17442acf5c542c3f0be5c58e6334997a",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://802138707f2063dc6ee90616c2a8874a32fe2cfb1a2739cec9ad465c0ce9b774",
-				"dweb:/ipfs/QmPnikK59yYyUfifsYS6Sm3pU1H2WPh3VNnnLw8CtUAVQp"
+				"bzz-raw://b0330fe6456b9a7d02de378c288c9bbfd7338b1a78a7f2a5b3ac4780a8b9f837",
+				"dweb:/ipfs/QmZ2wPSSsQFyKqsLyEpWTMcd1maDComBQJJE59DV111sfN"
 			]
 		}
 	},

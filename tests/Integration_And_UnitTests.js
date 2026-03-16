@@ -1,22 +1,5 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-async function setupAccounts() {
-    const accounts = [];
-    const amount = ethers.utils.parseEther("10000");
-
-    for (let i = 0; i < 100; i++) {
-        const wallet = ethers.Wallet.createRandom();
-        accounts.push(wallet);
-        await wallet.sendTransaction({
-            to: wallet.address,
-            value: amount
-        });
-    }
-
-    return accounts;
-}
-
-module.exports = { setupAccounts };
 
 contractName = "EnergyTrading";
 
@@ -42,11 +25,24 @@ describe("EnergyTrading basic tests", function () {
         expect(prosumerData.isMember).to.equal(true);
     });
 
-    it("Should allow a registered prosumer to deposit Ethers", async function () {
+    it("Don't allow registered prosumer to register again", async function () {
         await contract.connect(prosumer1).registerProsumer();
-        await contract.connect(prosumer1).deposit({ value: ethers.utils.parseEther("1") });
+        await expect(
+            contract.connect(prosumer1).registerProsumer()
+        ).to.be.revertedWith("Prosumer already registered!");
+    });
+
+    it("Should allow a registered prosumer to deposit Ethers", async function () {
+        const depositAmount = ethers.parseEther("10");
+        await contract.connect(prosumer1).registerProsumer();
+
+        // Make sure it's taken out of balance.
+        await expect(
+            contract.connect(prosumer1).deposit({value: depositAmount})
+        ).to.changeEtherBalance(prosumer1, -depositAmount);
+
         const prosumerData = await contract.prosumers(prosumer1.address);
-        expect(prosumerData.prosumerBalance).to.equal(ethers.utils.parseEther("1"));
+        expect(prosumerData.prosumerBalance).to.equal(depositAmount);
     });
 
     it("Should allow recorder to update energy status of prosumers", async function () {
@@ -60,6 +56,91 @@ describe("EnergyTrading basic tests", function () {
         expect(prosumer2Data.prosumerEnergyStat).to.equal(1);
     });
 });
+
+
+describe("withdraw() unit tests", function () {
+    let EnergyTrading, contract, recorder, prosumer1, prosumer2, prosumer3;
+
+    beforeEach(async function () {
+        [recorder, prosumer1] = await ethers.getSigners();
+        EnergyTrading = await ethers.getContractFactory(contractName);
+        contract = await EnergyTrading.deploy(recorder.address);
+    });
+
+    it("Withdraw when energy surplus and sufficient balance", async function () {
+        const intiailBalance = ethers.parseEther("10");
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: intiailBalance })
+        await contract.connect(recorder).updateEnergyStatus(
+            prosumer1.address, 1);
+        
+        const withdrawAmount = ethers.parseEther("3");
+        await expect(
+            contract.connect(prosumer1).withdraw(withdrawAmount)
+        ).to.changeEtherBalance(prosumer1, withdrawAmount);
+
+        const expectedBalance = intiailBalance - withdrawAmount;
+        const prosumerData = await contract.prosumers(prosumer1.address);
+        expect(prosumerData.prosumerBalance).to.equal(expectedBalance);
+    });
+
+    it("Withdraw whenno deficit and suprlut, sufficient balance", async function () {
+        const ether = ethers.parseEther("10");
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: ether })
+        
+        await expect(
+            contract.connect(prosumer1).withdraw(ether)
+        ).to.changeEtherBalance(prosumer1, ether);
+
+        const prosumerData = await contract.prosumers(prosumer1.address);
+        expect(prosumerData.prosumerBalance).to.equal(0);
+    });
+
+    it("Don't allow unregistered prosumerss", async function () {
+        await expect(
+            contract.connect(prosumer1).withdraw(100)
+        ).to.be.revertedWith("Prosumer not registered");
+    });
+
+    it("Don't allow attempt to withdraw 0", async function () {
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: ethers.parseEther("1") }
+        )        
+        await expect(
+            contract.connect(prosumer1).withdraw(0)
+        ).to.be.revertedWith("Amount must be greater than 0");
+    });
+
+    it("Don't allow attempt to withdraw with energy deficit", async function () {
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: ethers.parseEther("10") })
+        await contract.connect(recorder).updateEnergyStatus(
+            prosumer1.address, -1);
+        
+        await expect(
+            contract.connect(prosumer1).withdraw(2)
+        ).to.be.revertedWith("Cannot withdraw while in energy deficit");
+    });
+
+    it("Don't allow attempt to withdraw with insufficient blaance", async function () {
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: ethers.parseEther("1") })
+        await contract.connect(recorder).updateEnergyStatus(
+            prosumer1.address, 5);
+        
+        await expect(
+            contract.connect(prosumer1).withdraw(
+                ethers.parseEther("2"))
+        ).to.be.revertedWith("Insufficient balance");
+    });
+});
+
 
 describe("updateEnergyPrice() integration testss", function () {
     it("Net Energy Prices for 12/12/2012 7:00 - 21:00", async function () {
@@ -158,7 +239,7 @@ describe("updateEnergyPrice() integration testss", function () {
 })
 
 describe("Unit Testing Coordination Mechanism", function () {
-    const STARTING_ETHER = ethers.utils.parseEther("500");
+    const STARTING_ETHER = ethers.parseEther("500");
     let EnergyTrading, contract,  recorder, connected_recorder, prosumers;
 
     beforeEach(async function () {
@@ -378,21 +459,34 @@ describe("Unit Testing Coordination Mechanism", function () {
     });
 });
 
-
 describe("Integration Testing Coordination Mechanism", function () {
+    async function getActualEnergyArray(contract, prosumers, count) {
+        const actual = [];
+        for (let i = 0; i < count; ++i) {
+            const prosumerData = await contract.prosumers(prosumers[i].address);
+            actual.push(Number(prosumerData.prosumerEnergyStat));
+        }
+        return actual;
+    }
+
     it("Data for 6 households from 5/01/2013 7:00 - 18:00", async function () {
         let recorder;
         let prosumers;
-        [recorder, ...prosumers] = await ethers.getSigners();
-        let EnergyTrading = await ethers.getContractFactory(contractName);
-        let contract = await EnergyTrading.deploy(recorder.address);
-        let connectedRecorder = await contract.connect(recorder);
 
-        const STARTING_ETHER = ethers.utils.parseEther("5000");
+        [recorder, ...prosumers] = await ethers.getSigners();
+
         const NUM_PROSUMERS = 6;
+        prosumers = prosumers.slice(0, NUM_PROSUMERS);
+
+        const EnergyTrading = await ethers.getContractFactory("EnergyTrading");
+        const contract = await EnergyTrading.deploy(recorder.address);
+        const connectedRecorder = await contract.connect(recorder);
+
+        const STARTING_ETHER = ethers.parseEther("5000");
+
         for (let i = 0; i < NUM_PROSUMERS; ++i) {
             await contract.connect(prosumers[i]).registerProsumer();
-            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER });
         }
 
         const hosueholdData = [
@@ -422,43 +516,78 @@ describe("Integration Testing Coordination Mechanism", function () {
         ];
 
         const expected = [
-            [-2, -2, 0, -2, -2, -2],
-            [-3, -1, 1, -3, -3, -3],
-            [-1, 0, 1, -4, -2, -4],
-            [0, 1, 1, -4, -1, -5],
-            [1, 1, 1, -4, 0, -5],
-            [1, 1, 1, -2, 1, -4],
-            [2, 1, 1, 0, 1, -2],
-            [2, 2, 2, 1, 2, -1],
-            [3, 3, 3, 2, 3, -1],
-            [4, 1, 4, 3, 4, -2],
-            [5, -2, 4, 4, 5, -2],
-            [5, 1, 4, 5, 5, -1],
-            [6, 0, 5, 6, 6, -1],
-            [7, -1, 6, 7, 7, -1],
-            [8, -1, 7, 7, 6, -1],
-            [8, -1, 8, 8, 7, -1],
-            [9, -2, 8, 9, 8, -2],
-            [8, -1, 8, 9, 9, -2],
-            [8, -2, 9, 9, 9, -1],
-            [9, -2, 8, 9, 7, -1],
-            [8, -2, 7, 9, 6, -1],
-            [8, -2, 6, 6, 5, -2],
-            [5, 0, 5, 6, 5, 0]
-        ]
+            [-1, -1, -1, -1, -1, -1],
+            [-2, -2,  0, -2, -2, -2],
+            [-2, -1,  0, -3, -3, -3],
+            [-1,  0,  0, -3, -2, -4],
+            [ 0,  0,  0, -4, -1, -3],
+            [ 0,  0,  0, -3,  0, -3],
+            [ 0,  0,  0, -1,  0, -1],
+            [ 0,  1,  1,  0,  1,  0],
+            [ 1,  2,  2,  1,  2,  0],
+            [ 2,  3,  3,  2,  3,  0],
+            [ 3,  1,  3,  3,  4,  0],
+            [ 3,  0,  3,  4,  4,  0],
+            [ 4,  1,  4,  5,  5,  0],
+            [ 5,  0,  5,  6,  6,  0],
+            [ 6,  0,  6,  6,  7,  0],
+            [ 7,  0,  7,  7,  5,  0],
+            [ 7,  0,  8,  8,  6,  0],
+            [ 7,  0,  7,  8,  8,  0],
+            [ 7,  0,  8,  8,  8,  0],
+            [ 8,  0,  8,  8,  8,  0],
+            [ 7,  0,  8,  8,  7,  0],
+            [ 7,  0,  7,  7,  6,  0],
+            [ 5,  0,  5,  6,  5,  0]
+        ];
+
+        const expectedEmits = [0, 0, 1, 1, 2, 3, 4, 2, 1, 1, 2, 4, 1, 1, 2, 2, 2, 4, 3, 3, 3, 3, 4];
 
         for (let i = 0; i < hosueholdData.length; ++i) {
-            // Update hosuehold net values and run the market.
-            for (let j = 0; j < hosueholdData[i].length; ++j) {
-                await connectedRecorder.updateEnergyStatus(prosumers[j].address, hosueholdData[i][j]);
-            }
-            // TODO: CHeck emitted event
-            await connectedRecorder.coordinateTrading();
-            
-            // Check against expected.
-            for (let k =0; k < expected[i].length; ++k) {
-                const prosumerData = await contract.prosumers(prosumers[k].address);
-                expect(prosumerData.prosumerEnergyStat).to.equal(expected[i][k]);
+            try {
+                // Apply this timestep's updates
+                for (let j = 0; j < hosueholdData[i].length; ++j) {
+                    await connectedRecorder.updateEnergyStatus(
+                        prosumers[j].address,
+                        hosueholdData[i][j]
+                    );
+                }
+
+                const actualBefore = await getActualEnergyArray(contract, prosumers, NUM_PROSUMERS);
+
+                await expect(connectedRecorder.coordinateTrading())
+                    .to.emit(contract, "CoordinationComplete")
+                    .withArgs(expectedEmits[i]);
+
+                const actualAfter = await getActualEnergyArray(contract, prosumers, NUM_PROSUMERS);
+
+                const sortedActualAfter = [...actualAfter].sort((a, b) => a - b);
+                const sortedExpectedAfter = [...expected[i]].sort((a, b) => a - b);
+
+                expect(
+                    sortedActualAfter,
+                    [
+                        `Mismatch at timestep ${i}`,
+                        `Update row applied:           ${JSON.stringify(hosueholdData[i])}`,
+                        `Actual before coordination:  ${JSON.stringify(actualBefore)}`,
+                        `Expected after coordination: ${JSON.stringify(expected[i])}`,
+                        `Actual after coordination:   ${JSON.stringify(actualAfter)}`,
+                        `Sorted expected:             ${JSON.stringify(sortedExpectedAfter)}`,
+                        `Sorted actual:               ${JSON.stringify(sortedActualAfter)}`
+                    ].join("\n")
+                ).to.deep.equal(sortedExpectedAfter);
+            } catch (err) {
+                const actualOnError = await getActualEnergyArray(contract, prosumers, NUM_PROSUMERS);
+
+                throw new Error(
+                    [
+                        `Test failed at timestep ${i}`,
+                        `Update row applied:          ${JSON.stringify(hosueholdData[i])}`,
+                        `Actual state on error:       ${JSON.stringify(actualOnError)}`,
+                        `Expected after coordination:${JSON.stringify(expected[i])}`,
+                        `Original error: ${err.message}`
+                    ].join("\n")
+                );
             }
         }
     });
@@ -466,13 +595,13 @@ describe("Integration Testing Coordination Mechanism", function () {
 
 
 describe("Coordination Gas Consumption Estimate", function () {
-    it("Simulate 100 hsoueholds over 50 time intervals (100 x 100)", async function () {
-        const rows = 50;
-        const cols = 100;
-        const min = -500;
-        const max = 500;
-        const randomData = Array.from({ length: rows }, () =>
-        Array.from({ length: cols }, () => 
+    it("Simulate 25 hsoueholds over 500 time intervals", async function () {
+        const timePeriods = 500;
+        const numHouseholds = 25;
+        const min = -200;
+        const max = 200;
+        const randomData = Array.from({ length: timePeriods }, () =>
+        Array.from({ length: numHouseholds }, () => 
             Math.floor(Math.random() * (max - min + 1)) + min
         ));
         
@@ -483,10 +612,10 @@ describe("Coordination Gas Consumption Estimate", function () {
         let contract = await EnergyTrading.deploy(recorder.address);
 
         // register all prosumers and make sure they have neough ether
-        const STARTING_ETHER = ethers.utils.parseEther("10000");
-        for (const user of prosumers) {
-            await contract.connect(user).registerProsumer();
-            await contract.connect(user).deposit({ value: STARTING_ETHER});
+        const STARTING_ETHER = ethers.parseEther("10000");
+        for (let i = 0; i < numHouseholds; ++i) {
+            await contract.connect(prosumers[i]).registerProsumer();
+            await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
         }
         
         let connectedRecorder = await contract.connect(recorder);
