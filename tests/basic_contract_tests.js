@@ -25,11 +25,24 @@ describe("EnergyTrading basic tests", function () {
         expect(prosumerData.isMember).to.equal(true);
     });
 
-    it("Should allow a registered prosumer to deposit Ethers", async function () {
+    it("Don't allow registered prosumer to register again", async function () {
         await contract.connect(prosumer1).registerProsumer();
-        await contract.connect(prosumer1).deposit({ value: ethers.parseEther("1") });
+        await expect(
+            contract.connect(prosumer1).registerProsumer()
+        ).to.be.revertedWith("Prosumer already registered!");
+    });
+
+    it("Should allow a registered prosumer to deposit Ethers", async function () {
+        const depositAmount = ethers.parseEther("10");
+        await contract.connect(prosumer1).registerProsumer();
+
+        // Make sure it's taken out of balance.
+        await expect(
+            contract.connect(prosumer1).deposit({value: depositAmount})
+        ).to.changeEtherBalance(prosumer1, -depositAmount);
+
         const prosumerData = await contract.prosumers(prosumer1.address);
-        expect(prosumerData.prosumerBalance).to.equal(ethers.parseEther("1"));
+        expect(prosumerData.prosumerBalance).to.equal(depositAmount);
     });
 
     it("Should allow recorder to update energy status of prosumers", async function () {
@@ -43,6 +56,91 @@ describe("EnergyTrading basic tests", function () {
         expect(prosumer2Data.prosumerEnergyStat).to.equal(1);
     });
 });
+
+
+describe("withdraw() unit tests", function () {
+    let EnergyTrading, contract, recorder, prosumer1, prosumer2, prosumer3;
+
+    beforeEach(async function () {
+        [recorder, prosumer1] = await ethers.getSigners();
+        EnergyTrading = await ethers.getContractFactory(contractName);
+        contract = await EnergyTrading.deploy(recorder.address);
+    });
+
+    it("Withdraw when energy surplus and sufficient balance", async function () {
+        const intiailBalance = ethers.parseEther("10");
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: intiailBalance })
+        await contract.connect(recorder).updateEnergyStatus(
+            prosumer1.address, 1);
+        
+        const withdrawAmount = ethers.parseEther("3");
+        await expect(
+            contract.connect(prosumer1).withdraw(withdrawAmount)
+        ).to.changeEtherBalance(prosumer1, withdrawAmount);
+
+        const expectedBalance = intiailBalance - withdrawAmount;
+        const prosumerData = await contract.prosumers(prosumer1.address);
+        expect(prosumerData.prosumerBalance).to.equal(expectedBalance);
+    });
+
+    it("Withdraw whenno deficit and suprlut, sufficient balance", async function () {
+        const ether = ethers.parseEther("10");
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: ether })
+        
+        await expect(
+            contract.connect(prosumer1).withdraw(ether)
+        ).to.changeEtherBalance(prosumer1, ether);
+
+        const prosumerData = await contract.prosumers(prosumer1.address);
+        expect(prosumerData.prosumerBalance).to.equal(0);
+    });
+
+    it("Don't allow unregistered prosumerss", async function () {
+        await expect(
+            contract.connect(prosumer1).withdraw(100)
+        ).to.be.revertedWith("Prosumer not registered");
+    });
+
+    it("Don't allow attempt to withdraw 0", async function () {
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: ethers.parseEther("1") }
+        )        
+        await expect(
+            contract.connect(prosumer1).withdraw(0)
+        ).to.be.revertedWith("Amount must be greater than 0");
+    });
+
+    it("Don't allow attempt to withdraw with energy deficit", async function () {
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: ethers.parseEther("10") })
+        await contract.connect(recorder).updateEnergyStatus(
+            prosumer1.address, -1);
+        
+        await expect(
+            contract.connect(prosumer1).withdraw(2)
+        ).to.be.revertedWith("Cannot withdraw while in energy deficit");
+    });
+
+    it("Don't allow attempt to withdraw with insufficient blaance", async function () {
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer1).deposit(
+            { value: ethers.parseEther("1") })
+        await contract.connect(recorder).updateEnergyStatus(
+            prosumer1.address, 5);
+        
+        await expect(
+            contract.connect(prosumer1).withdraw(
+                ethers.parseEther("2"))
+        ).to.be.revertedWith("Insufficient balance");
+    });
+});
+
 
 describe("updateEnergyPrice() integration testss", function () {
     it("Net Energy Prices for 12/12/2012 7:00 - 21:00", async function () {
@@ -408,7 +506,7 @@ describe("Integration Testing Coordination Mechanism", function () {
             [-2, -2,  0, -2, -2, -2],
             [-2, -1,  0, -3, -3, -3],
             [-1,  0,  0, -3, -2, -4],
-            [ 0,  0,  0, -3, -1, -4],
+            [0, 0, 0, -4, -1, -3],
             [ 0,  0,  0, -3,  0, -3],
             [ 0,  0,  0, -1,  0, -1],
             [ 0,  1,  1,  0,  1,  0],
