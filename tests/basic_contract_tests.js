@@ -459,6 +459,7 @@ describe("Unit Testing Coordination Mechanism", function () {
     });
 });
 
+
 describe("Integration Testing Coordination Mechanism", function () {
     it("Data for 6 households from 5/01/2013 7:00 - 18:00", async function () {
         let recorder;
@@ -475,7 +476,7 @@ describe("Integration Testing Coordination Mechanism", function () {
             await contract.connect(prosumers[i]).deposit({ value: STARTING_ETHER});
         }
 
-        const hosueholdData = [
+        const householdData = [
             [-1, -1, -1, -1, -1, -1],
             [-1, -1, 1, -1, -1, -1],
             [-1, 1, 1, -1, -1, -1],
@@ -513,14 +514,14 @@ describe("Integration Testing Coordination Mechanism", function () {
             [ 1,  2,  2,  1,  2,  0],
             [ 2,  3,  3,  2,  3,  0],
             [ 3,  1,  3,  3,  4,  0],
-            [ 3,  0,  3,  4,  4,  0],
-            [ 4,  1,  4,  5,  5,  0],
-            [ 5,  0,  5,  6,  6,  0],
-            [ 6,  0,  6,  6,  7,  0],
-            [ 6,  0,  7,  7,  6,  0],
-            [ 7,  0,  7,  8,  7,  0],
-            [ 7,  0,  7,  8,  8,  0],
-            [ 7,  0,  8,  8,  8,  0],
+            [3, 0, 4, 4, 3, 0],
+            [ 4, 1, 5, 5, 4, 0],
+            [ 5, 0, 6, 6, 5, 0],
+            [ 6, 0, 6, 7, 6, 0 ], 
+            [ 7, 0, 7, 7, 5, 0],
+            [ 7, 0, 8, 8, 6, 0], 
+            [ 7, 0, 8, 8, 7, 0],
+            [ 8, 0, 7, 8, 8, 0], 
             [ 8,  0,  8,  8,  8,  0],
             [ 7,  0,  8,  8,  7,  0],
             [ 7,  0,  7,  7,  6,  0],
@@ -531,16 +532,16 @@ describe("Integration Testing Coordination Mechanism", function () {
         // It should be the amount of total energy excahnged at end of coordiantion.
         const expectyedEmtis = [0, 0, 1, 1, 2, 3, 4, 2, 1, 1, 2, 4, 1, 1, 2, 2, 2, 4, 3, 3, 3, 3, 4]
 
-        for (let i = 0; i < hosueholdData.length; ++i) {
+        for (let i = 0; i < householdData.length; ++i) {
             // Update hosuehold net values and run the market.
-            for (let j = 0; j < hosueholdData[i].length; ++j) {
-                await connectedRecorder.updateEnergyStatus(prosumers[j].address, hosueholdData[i][j]);
+            for (let j = 0; j < householdData[i].length; ++j) {
+                await connectedRecorder.updateEnergyStatus(prosumers[j].address, householdData[i][j]);
             }
-            // TODO: CHeck emitted event
+            
             await expect(connectedRecorder.coordinateTrading())
                 .to.emit(contract, "CoordinationComplete")
                 .withArgs(expectyedEmtis[i]);  
-            
+
             // Check against expected.
             for (let k =0; k < expected[i].length; ++k) {
                 const prosumerData = await contract.prosumers(prosumers[k].address);
