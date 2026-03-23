@@ -58,6 +58,157 @@ describe("EnergyTrading basic tests", function () {
 });
 
 
+describe("sellEnergyTo() unit tests", function () {
+    // recorder is also considered seller.
+    let EnergyTrading, contract, recorder, buyer;
+
+    beforeEach(async function () {
+        [recorder, buyer] = await ethers.getSigners();
+        EnergyTrading = await ethers.getContractFactory(contractName);
+        contract = await EnergyTrading.deploy(recorder.address);
+    });
+
+    it("Valid sell", async function () {
+        await contract.connect(recorder).registerProsumer();
+        await contract.connect(recorder).updateEnergyStatus(
+            recorder.address, 3);
+
+        const ether = ethers.parseEther("10");
+        await contract.connect(buyer).registerProsumer();
+        await contract.connect(buyer).deposit({value: ether});
+        await contract.connect(recorder).updateEnergyStatus(
+            buyer.address, -6);
+        
+        // Sell 1 unit
+        await contract.connect(recorder).sellEnergyTo(
+            buyer.address, 1);
+        
+        let buyerData = await contract.prosumers(buyer.address);
+        let sellerData = await contract.prosumers(recorder.address);
+        expect(buyerData.prosumerEnergyStat).to.equal(-5);
+        expect(sellerData.prosumerEnergyStat).to.equal(2);
+        expect(buyerData.prosumerBalance).to.equal(
+            ethers.parseEther("9"));
+        expect(sellerData.prosumerBalance).to.equal(
+            ethers.parseEther("1"))
+
+        // Sell exactly surplurs
+        await contract.connect(recorder).sellEnergyTo(
+            buyer.address, 2);
+        
+        buyerData = await contract.prosumers(buyer.address);
+        sellerData = await contract.prosumers(recorder.address);
+        expect(buyerData.prosumerEnergyStat).to.equal(-3);
+        expect(sellerData.prosumerEnergyStat).to.equal(0);
+        expect(buyerData.prosumerBalance).to.equal(
+            ethers.parseEther("7"));
+        expect(sellerData.prosumerBalance).to.equal(
+            ethers.parseEther("3"))
+    });
+
+    it("Cannot sell to buyer with insufficient balance", async function () {
+        await contract.connect(recorder).registerProsumer();
+        await contract.connect(recorder).updateEnergyStatus(
+            recorder.address, 3);
+
+        const ether = ethers.parseEther("2");
+        await contract.connect(buyer).registerProsumer();
+        await contract.connect(buyer).deposit({value: ether});
+        await contract.connect(recorder).updateEnergyStatus(
+            buyer.address, -6);
+        
+        await expect(
+            contract.connect(recorder).sellEnergyTo(
+                buyer.address, 3)
+        ).to.revertedWith("Insufficient buyer balance");
+    });
+
+    it("Don't allow sell to self", async function () {
+        await contract.connect(recorder).registerProsumer();
+        await expect(
+            contract.connect(recorder).sellEnergyTo(recorder.address, 10)
+        ).to.revertedWith("Cannot sell to self");
+    });
+
+    it("Don't allow unregistered user to sell", async function () {
+        await contract.connect(buyer).registerProsumer();
+        await expect(
+            contract.connect(recorder).sellEnergyTo(buyer.address, 10)
+        ).to.revertedWith("Prosumer not registered");
+    });
+
+    it("Don't allow registered user to sell to unregistered user", async function () {
+        await contract.connect(recorder).registerProsumer();
+        await expect(
+            contract.connect(recorder).sellEnergyTo(buyer.address, 10)
+        ).to.revertedWith("Buyer not registered");
+    });
+
+    it("Cannot sell 0 energy", async function () {
+        await contract.connect(recorder).registerProsumer();
+        await contract.connect(buyer).registerProsumer();
+        await expect(
+            contract.connect(recorder).sellEnergyTo(buyer.address, 0)
+        ).to.revertedWith("Energy amount must be > 0");
+    });
+    
+    it("Don't allow seller with no surplus to sell", async function () {
+        // 0 net energy
+        await contract.connect(recorder).registerProsumer();
+        
+        const ether = ethers.parseEther("10");
+        await contract.connect(buyer).registerProsumer();
+        await contract.connect(buyer).deposit({value: ether});
+        await contract.connect(recorder).updateEnergyStatus(buyer.address, 1);
+        await expect(
+            contract.connect(recorder).sellEnergyTo(buyer.address, 3)
+        ).to.revertedWith("Seller is not in surplus");
+
+
+        await contract.connect(recorder).updateEnergyStatus(recorder.address, -10);
+        await expect(
+            contract.connect(recorder).sellEnergyTo(buyer.address, 3)
+        ).to.revertedWith("Seller is not in surplus");
+    });
+
+    it("Don't sell to buyer in suprlus or not in deficit", async function () {
+        await contract.connect(recorder).registerProsumer();
+            await contract.connect(recorder).updateEnergyStatus(
+                recorder.address, 20);
+
+        const ether = ethers.parseEther("10");
+        await contract.connect(buyer).registerProsumer();
+        await contract.connect(buyer).deposit({value: ether});
+        await expect(
+            contract.connect(recorder).sellEnergyTo(buyer.address, 1)
+        ).to.revertedWith("Buyer is not in deficit");
+
+        await contract.connect(recorder).updateEnergyStatus(buyer.address, 1);
+        await expect(
+            contract.connect(recorder).sellEnergyTo(buyer.address, 1)
+        ).to.revertedWith("Buyer is not in deficit");
+    });
+
+
+    it("Seller cannot oversell", async function () {
+        await contract.connect(recorder).registerProsumer();
+        await contract.connect(recorder).updateEnergyStatus(
+            recorder.address, 3);
+
+        const ether = ethers.parseEther("10");
+        await contract.connect(buyer).registerProsumer();
+        await contract.connect(buyer).deposit({value: ether});
+        await contract.connect(recorder).updateEnergyStatus(
+            buyer.address, -6);
+        
+        // Sell more than surplus
+        await expect(
+            contract.connect(recorder).sellEnergyTo(buyer.address, 4)
+        ).to.revertedWith("Energy exceeds seller surplus");
+    });
+
+});
+
 describe("buyEnergyFrom() unit tests", function () {
     let EnergyTrading, contract, recorder, prosumer1;
 
