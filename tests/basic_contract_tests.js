@@ -564,6 +564,7 @@ describe("updateEnergyPrice() integration testss", function () {
 
 describe("Unit Testing Coordination Mechanism", function () {
     const STARTING_ETHER = ethers.parseEther("500");
+    const ETHER = ethers.parseEther("1");
     let EnergyTrading, contract,  recorder, connected_recorder, prosumers;
 
     beforeEach(async function () {
@@ -603,9 +604,9 @@ describe("Unit Testing Coordination Mechanism", function () {
         // Just a sanity check
         // We expect prosumer1 to buy and prosumer 5 to sell
         prosumerData = await contract.prosumers(prosumers[0].address);
-        expect(prosumerData.prosumerBalance).to.be.lessThan(STARTING_ETHER);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER - ETHER);
         prosumerData = await contract.prosumers(prosumers[4].address);
-        expect(prosumerData.prosumerBalance).to.be.greaterThan(STARTING_ETHER);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER + ETHER);
     });
 
     it("All zeroes", async function () {
@@ -630,7 +631,7 @@ describe("Unit Testing Coordination Mechanism", function () {
             
             // Check that nothing is taken out of balance.
             expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER );
-        }
+        }      
     });
 
     it("No surplus, all deficit", async function () {
@@ -709,6 +710,21 @@ describe("Unit Testing Coordination Mechanism", function () {
             const prosumerData = await contract.prosumers(prosumers[i].address);
             expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
         }
+
+        prosumerData = await contract.prosumers(prosumers[0].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER -4n * ETHER);
+
+        prosumerData = await contract.prosumers(prosumers[1].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER -4n * ETHER);
+
+        prosumerData = await contract.prosumers(prosumers[2].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER - ETHER);
+
+        prosumerData = await contract.prosumers(prosumers[3].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER + 2n * ETHER);
+
+        prosumerData = await contract.prosumers(prosumers[4].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER + 7n * ETHER);
     });
 
     it("More surplus than deficit", async function () {
@@ -733,6 +749,12 @@ describe("Unit Testing Coordination Mechanism", function () {
             const prosumerData = await contract.prosumers(prosumers[i].address);
             expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
         }
+
+        prosumerData = await contract.prosumers(prosumers[0].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER - ETHER);
+
+        prosumerData = await contract.prosumers(prosumers[4].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER + ETHER);
     });
 
      it("More deficit than surplus", async function () {
@@ -757,6 +779,12 @@ describe("Unit Testing Coordination Mechanism", function () {
             const prosumerData = await contract.prosumers(prosumers[i].address);
             expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
         }
+
+        // We expect prosumer1 to sell and prosumer 5 to buy
+        prosumerData = await contract.prosumers(prosumers[0].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER + ETHER);
+        prosumerData = await contract.prosumers(prosumers[4].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER - ETHER);
     });
 
     it("Check low variance requirment", async function () {
@@ -780,6 +808,14 @@ describe("Unit Testing Coordination Mechanism", function () {
             const prosumerData = await contract.prosumers(prosumers[i].address);
             expect(prosumerData.prosumerEnergyStat).to.equal(exptectedState[i]);
         }
+
+        // We expect prosumer1 to buy 2 unites, 1 unit each from prsumer 2 and 3
+        prosumerData = await contract.prosumers(prosumers[0].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER - 2n * ETHER);
+        prosumerData = await contract.prosumers(prosumers[1].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER + ETHER);
+        prosumerData = await contract.prosumers(prosumers[2].address);
+        expect(prosumerData.prosumerBalance).to.equal(STARTING_ETHER + ETHER);
     });
 });
 
