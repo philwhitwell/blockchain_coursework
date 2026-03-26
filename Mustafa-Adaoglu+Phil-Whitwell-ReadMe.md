@@ -50,4 +50,111 @@ Plus three modifiers to save repeating the same reqquire statements in a number 
 
 
 ## Did you implement any additional test cases to test your smart contract? If so, what are these tests?
-<!-- Example: My contract passed an additional test case of ...  --
+No additional structs were introduced in this implementation. The contract uses the Prosumer struct that was provided in the assignment specification. 
+
+## Do you use any additional contract functions? If so, what is the purpose of each function? (no more than 200 words):
+Yes. One additional internal helper function, _executeTrade(), was introduced to improve code organisation and reduce duplication. Both buyEnergyFrom() and sellEnergyTo() perform the same core actions: validating that the buyer and seller are registered prosumers, checking that the seller has sufficient surplus energy and the buyer has sufficient deficit and deposited balance, transferring the payment between accounts, and updating the energy status of both parties. Instead of repeating this logic in both functions, the _executeTrade() function performs the common settlement and validation steps. The two public trading functions simply call this helper with the appropriate buyer and seller addresses.
+
+Using an internal function improves maintainability and readability of the contract. If the trade logic needs to be modified, the change only needs to be made in one place rather than duplicated across multiple functions. This approach also reduces the likelihood of inconsistencies or errors between the buy and sell implementations.
+Not strictly functions but a number of events were introduced to track the key transactions in the coordinated trading process.
+
+    event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
+    event ProsumerRegistered(address indexed prosumer);
+    event Deposit(address indexed prosumer, uint256 amount);
+    event Withdraw(address indexed prosumer, uint256 amount);
+    event EnergyStatusUpdated(address indexed prosumer,int256 deltaEnergy,int256 newEnergyStatus);
+    event EnergyTraded(address indexed seller,address indexed buyer,uint256 energyAmount,uint256 unitPrice,uint256 totalCost);
+
+Plus three modifiers to save repeating the same reqquire statements in a number of functions
+    modifier onlyRecorder() {
+        require(msg.sender == recorder, "Only recorder allowed");
+        _;
+    }
+    modifier isMember(){
+        require(prosumers[msg.sender].isMember, "Prosumer not registered");
+        _;
+    }
+    modifier isRegistered(address prosumerAddr) {
+        require(prosumers[prosumerAddr].isMember, "Prosumer not registered");
+        _;
+
+
+## Did you implement any additional test cases to test your smart contract? If so, what are these tests?
+We implmeneted a battery of unit tests as well as integration testing for the coordinatin mechanism.
+
+### Unit Tests
+Below we list out ht eadditonal unit tests we added.
+
+#### registerProsumer() Test
+- Check that registered prosumer cannot register again
+
+#### sellEnergyTo() Tests
+- Valid selling transaction
+- Cannot sell to buyer with insufficient balance
+- Don't allow sell to self
+- Don't allow unregistered user to sell
+- Don't allow registered user to sell to unregistered user
+- Cannot sell 0 energy
+- Don't allow seller with no surplus to sell
+- Don't sell to buyer in suprlus or not in deficit
+- Seller cannot oversell
+
+#### buyEnergyFrom() Tests
+- Registered prosumer with sufficient balance should be able to buy form registered user in surplus
+- Registered prosumer with sufficient balance should be able to buy exactly their deficit
+- Don't allow user with surplus to buy
+- Don't allow user with net 0 to buy
+- Don't allow buy from user with no surplus
+- Don't allow buying more than the seller has
+- Don't allow buying more than deficit
+- Don't allow unregistered user to buy
+- Don't allow registered user to buy from unregistered user
+- Don't allow buy from self
+- Cannot request to buy 0 energy
+- Don't allow buying more than balance
+
+#### withdraw() Tests
+- Withdraw when energy surplus and sufficient balance
+- Withdraw when net 0, sufficient balance
+- Don't allow unregistered account to withdraw
+- Don't allow attempt to withdraw 0
+- Don't allow attempt to withdraw with energy deficit
+- Don't allow attempt to withdraw with insufficient blaance
+
+#### coordinateTrading() tests
+- Test case/data from brief
+- Coordination when all net zero
+- No surplus, all deficit
+- No deficit, all surplurs
+- Equal negative, equal positive, all zero after coordinatoin
+- More surplus than deficit
+- More deficit than surplurs
+- Checl optimal low variance after coordination
+    -   before = [-2, 4, 4, 0, 0], after = [0, 3, 3, 0, 0]
+
+### Integration Testing
+For integration teting we used the [Open Power System Data household dataset](https://www.kaggle.com/datasets/youssefboutaleb/ausgrid-2024?resource=download)
+We wrote a Python/Pandas script to extract net household energy (generated - consumed) data for 6 households for 23 time periods, from 7:00 to 18:00 in 30 minute intervals.  6 households were chosen to make hand calculation of expected values more manageable and less error prone.
+
+The energy measurements in the datawset are in floating point kWh values but the contract assumes  energy in integer "units". We used a floor method to oconvert the floating point values to integers.
+Below is a sample output of processing the dataset:
+```
+Time 11:30
+net_each_household = [2, 1, 1, 1, 1, -1]
+----------------------------------------
+Time 12:00
+net_each_household = [2, -2, 1, 1, 1, -2]
+----------------------------------------
+Time 12:30
+net_each_household = [2, -3, 1, 1, 1, -2]
+```
+
+We use this data to create a simulationn of the trading, in the following loop over the time periods, starting with a net energy of 0.
+1. Update net energy of each household using data from the dataset.
+2. Find expected final energy sates after coordiation by hand
+3. Call coordinateTrading function
+4. Assert that the actual value is equal to expected.
+
+We perform the simulation to verify correct energy price updates as well.
+
+
