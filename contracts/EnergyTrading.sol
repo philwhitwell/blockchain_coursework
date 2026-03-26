@@ -242,7 +242,7 @@ contract EnergyTrading {
         uint256[] memory sellerAmt = new uint256[](n);
         uint256 sellersCount = 0;
 
-        // Amount of units to be sold by sellers.abi
+        // Amount of units to be sold by sellers
         // Used to batch updates for sellers rather than writing
         // constantly to blockchain state.
         uint256[] memory sellerTradeUnits = new uint256[](n);
@@ -251,8 +251,8 @@ contract EnergyTrading {
         uint256[] memory buyerAmt = new uint256[](n);
         uint256 buyersCount = 0;
 
-        // Amount of units to be sold by sellers.abi
-        // Used to batch updates for sellers rather than writing
+        // Amount of units to be bought by buyers
+        // Used to batch updates for buyers rather than writing
         // constantly to blockchain state.
         uint256[] memory buyerTradeUnits = new uint256[](n);
 
@@ -379,7 +379,7 @@ contract EnergyTrading {
             }
         }
 
-        // Update sellers.abi
+        // Update sellers
         for (uint i = 0; i < sellersCount; ++i) {
             if (sellerTradeUnits[i] > 0) {
                 address seller = sellers[i];
