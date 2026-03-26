@@ -875,17 +875,30 @@ describe("Integration Testing Coordination Mechanism", function () {
     });
 });
 
+// Simple RNG with seed for reproduceability
+function mulberry32(a) {
+    return function() {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
 
 describe("Coordination Gas Consumption Estimate", function () {
     it("Simulate 25 hsoueholds over 500 time intervals", async function () {
+       const rng = mulberry32(12345); 
+
         const timePeriods = 500;
         const numHouseholds = 25;
         const min = -200;
         const max = 200;
+
         const randomData = Array.from({ length: timePeriods }, () =>
-        Array.from({ length: numHouseholds }, () => 
-            Math.floor(Math.random() * (max - min + 1)) + min
-        ));
+            Array.from({ length: numHouseholds }, () => 
+                Math.floor(rng() * (max - min + 1)) + min
+            )
+        );
         
         let prosumers;
         let recorder;
