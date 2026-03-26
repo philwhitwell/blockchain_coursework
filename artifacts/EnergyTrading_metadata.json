@@ -232,11 +232,11 @@
 	},
 	"sources": {
 		"contracts/EnergyTrading.sol": {
-			"keccak256": "0x4a7c19e966105a222c9f9c0debfe00b45e7d102450e253de48e1e5c4d2f22311",
+			"keccak256": "0x652b8a7a564b0828ccb16e2d1d34ddea02217eb8db169532af7e30939bd3ba69",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://2c9aa154a5c0dcf45564e8c2cc1085b31d3c8d0f252f75dd959a7d075e8f1f56",
-				"dweb:/ipfs/QmVUx87JN3WcN1KN3AFKBwYSbF5DXbxfMMbKvGPUPEHLgW"
+				"bzz-raw://f80c647e653be8128810ab137aa4b927a81d9be6c1b918a343a76c375a169e47",
+				"dweb:/ipfs/QmdiSoo76RMh3pAjABufhVLNE5EQhRBtwj2hRQgDhwinZp"
 			]
 		}
 	},

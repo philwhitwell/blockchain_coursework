@@ -230,7 +230,7 @@ contract EnergyTrading {
         _executeTrade(msg.sender, _buyer, _offeredEnergy);
     }
 
-       function coordinateTrading() public onlyRecorder {
+    function coordinateTrading() public onlyRecorder {
         // First loop through all the prosumers and create an array of buyers and of sellers
         // Then sort sellers and buyers from biggest deficit and surplus to smallest
         // Then loop until all trades completed
@@ -256,7 +256,7 @@ contract EnergyTrading {
         // constantly to blockchain state.
         uint256[] memory buyerTradeUnits = new uint256[](n);
 
-        for (uint256 i = 0; i < n; ++i) {
+        for (uint256 i = 0; i < n; ++i) { //++i is more gas efficient than i++
             address a = prosumerAddresses[i];
             int256 e = prosumers[a].prosumerEnergyStat;
 
@@ -266,7 +266,6 @@ contract EnergyTrading {
                 ++sellersCount;
             } else if (e < 0) {
                 buyers[buyersCount] = a;
-                // TODO: casting negative to unsigned, dangerous?
                 buyerAmt[buyersCount] = uint256(-e); 
                 ++buyersCount;
             }
@@ -373,7 +372,7 @@ contract EnergyTrading {
         for (uint i = 0; i < buyersCount; ++i) {
             if (buyerTradeUnits[i] > 0) {
                 address buyer = buyers[i];
-                // COULD ADD THE REQUIRE CONDITION HERE.
+                // No need for require to check the the buyer has enough ethers as not needed in the description
                 prosumers[buyer].prosumerBalance -= buyerTradeUnits[i] * currentPrice;
                 prosumers[buyer].prosumerEnergyStat += int256(buyerTradeUnits[i]);
             }
