@@ -29,12 +29,12 @@ contract EnergyTrading {
 
     //PW Variables added
     address[] public prosumerAddresses; //Added as appears mappings are not iterable
-    event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
-    event ProsumerRegistered(address indexed prosumer);
-    event Deposit(address indexed prosumer, uint256 amount);
-    event Withdraw(address indexed prosumer, uint256 amount);
-    event EnergyStatusUpdated(address indexed prosumer,int256 deltaEnergy,int256 newEnergyStatus);
-    event EnergyTraded(address indexed seller,address indexed buyer,uint256 energyAmount,uint256 unitPrice,uint256 totalCost);
+    // event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
+    // event ProsumerRegistered(address indexed prosumer);
+    // event Deposit(address indexed prosumer, uint256 amount);
+    // event Withdraw(address indexed prosumer, uint256 amount);
+    // event EnergyStatusUpdated(address indexed prosumer,int256 deltaEnergy,int256 newEnergyStatus);
+    // event EnergyTraded(address indexed seller,address indexed buyer,uint256 energyAmount,uint256 unitPrice,uint256 totalCost);
 
     modifier onlyRecorder() {
         require(msg.sender == recorder, "Only recorder allowed");
@@ -69,7 +69,7 @@ contract EnergyTrading {
             isMember: true});
 
         prosumerAddresses.push(msg.sender);
-        emit ProsumerRegistered(msg.sender); //This uses gas but improves understanding
+        // emit ProsumerRegistered(msg.sender); //This uses gas but improves understanding
     }
 
     function deposit() isMember external payable {
@@ -79,7 +79,7 @@ contract EnergyTrading {
         //added as modifier require(prosumers[msg.sender].isMember, "Prosumer not registered");
         require(msg.value > 0, "Deposit must be greater than 0");
         prosumers[msg.sender].prosumerBalance += msg.value;
-        emit Deposit(msg.sender, msg.value);
+        // emit Deposit(msg.sender, msg.value);
     }
     
     function withdraw(uint256 _value) external isMember {
@@ -97,7 +97,7 @@ contract EnergyTrading {
         //value is updated for Balance but then update the sender's ether
         (bool ok, ) = msg.sender.call{value: _value}("");
         require(ok, "ETH transfer failed");
-        emit Withdraw(msg.sender, _value);
+        // emit Withdraw(msg.sender, _value);
     }
 
 
@@ -116,7 +116,7 @@ contract EnergyTrading {
             Prosumer storage p = prosumers[_prosumer];
             p.prosumerEnergyStat += deltaEnergy;
 
-            emit EnergyStatusUpdated(_prosumer, deltaEnergy, p.prosumerEnergyStat);
+            // emit EnergyStatusUpdated(_prosumer, deltaEnergy, p.prosumerEnergyStat);
         }
 
 
@@ -165,7 +165,7 @@ contract EnergyTrading {
 
         energyPrice = price;
 
-        emit EnergyPriceUpdated(price, total);
+        // emit EnergyPriceUpdated(price, total);
     }
     function _executeTrade(address _seller, address _buyer, uint256 _energyAmount) internal {
         //Internal function, as realised that buy and sell energy had a lot of repeated code
@@ -208,7 +208,7 @@ contract EnergyTrading {
         seller.prosumerEnergyStat -= int256(_energyAmount);
         buyer.prosumerEnergyStat  += int256(_energyAmount);
 
-        emit EnergyTraded(_seller, _buyer, _energyAmount, energyPrice, cost);
+        // emit EnergyTraded(_seller, _buyer, _energyAmount, energyPrice, cost);
 }
 
 

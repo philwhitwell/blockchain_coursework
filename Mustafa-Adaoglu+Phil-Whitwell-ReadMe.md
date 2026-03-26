@@ -5,12 +5,12 @@ Your teammate's name: Mustafa Adaoglu
 Your teammate's student ID: sc20m2a
 
 ## Description of the proposed coordination mechanism implemented in the coordinatedTrading() function (no more than 200 words):
-The coordinateTrading() function implements a simple coordination mechanism that redistributes surplus energy among prosumers in discrete trading steps. The function first iterates through all registered prosumers and separates them into two groups: sellers, who have positive energy surplus, and buyers, who have negative energy balance (energy deficit). Two arrays store the addresses of sellers and buyers together with the magnitude of their surplus or deficit.
+The coordinateTrading() function implements a simple coordination mechanism that redistributes surplus energy among prosumers in discrete trading steps. The function first iterates through all registered prosumers and separates them into two groups: sellers, who have positive energy surplus, and buyers, who have negative energy balance (energy deficit). Two 'memory' structures store the addresses of sellers and buyers together with the magnitude of their surplus or deficit. 'memory' is a temporary storage location that is cleared after the function execution completes. It is cheaper to use than storage arrays for temporary data.
 
 Both groups are then sorted in descending order so that the largest surplus sellers and largest deficit buyers are prioritised. The algorithm then repeatedly performs one-unit energy trades. In each iteration, the buyer with the largest remaining deficit and the seller with the largest remaining surplus are selected. One unit of energy is transferred by decreasing the seller’s energy status and increasing the buyer’s energy status, while the corresponding payment is transferred between their balances.
 
 This process continues until either no buyers have remaining deficit or no sellers have remaining surplus. The function tracks the total number of successful trades and emits the CoordinationComplete event with this value once coordination finishes.
-These two cases aided getting the sorting correct
+These two cases aided getting the sorting correct.  A number of different algorithms were tried to improve performance by making trades in larger amounts e.g. [5,0,0,0,-5] -> [0,0,0,0,0] in a single trade but this either failed the simpler test cases or increased the overall Gas Efficiency.
 $$[1,1,1,-5,0,-4] -> [0,0,0,-3,0,-3]$$
 
 $$[8,-1,7,7,6,-1] -> [6,0,7,7,6,0]$$
@@ -26,8 +26,8 @@ No additional structs were introduced in this implementation. The contract uses 
 Yes. One additional internal helper function, _executeTrade(), was introduced to improve code organisation and reduce duplication. Both buyEnergyFrom() and sellEnergyTo() perform the same core actions: validating that the buyer and seller are registered prosumers, checking that the seller has sufficient surplus energy and the buyer has sufficient deficit and deposited balance, transferring the payment between accounts, and updating the energy status of both parties. Instead of repeating this logic in both functions, the _executeTrade() function performs the common settlement and validation steps. The two public trading functions simply call this helper with the appropriate buyer and seller addresses.
 
 Using an internal function improves maintainability and readability of the contract. If the trade logic needs to be modified, the change only needs to be made in one place rather than duplicated across multiple functions. This approach also reduces the likelihood of inconsistencies or errors between the buy and sell implementations.
-Not strictly functions but a number of events were introduced to track the key transactions in the coordinated trading process.
-
+Not strictly functions but a number of events were introduced to track the key transactions in the contract. 
+These were commented out in the final contract to improve performace.
     event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
     event ProsumerRegistered(address indexed prosumer);
     event Deposit(address indexed prosumer, uint256 amount);
@@ -35,37 +35,7 @@ Not strictly functions but a number of events were introduced to track the key t
     event EnergyStatusUpdated(address indexed prosumer,int256 deltaEnergy,int256 newEnergyStatus);
     event EnergyTraded(address indexed seller,address indexed buyer,uint256 energyAmount,uint256 unitPrice,uint256 totalCost);
 
-Plus three modifiers to save repeating the same reqquire statements in a number of functions
-    modifier onlyRecorder() {
-        require(msg.sender == recorder, "Only recorder allowed");
-        _;
-    }
-    modifier isMember(){
-        require(prosumers[msg.sender].isMember, "Prosumer not registered");
-        _;
-    }
-    modifier isRegistered(address prosumerAddr) {
-        require(prosumers[prosumerAddr].isMember, "Prosumer not registered");
-        _;
-
-
-## Did you implement any additional test cases to test your smart contract? If so, what are these tests?
-No additional structs were introduced in this implementation. The contract uses the Prosumer struct that was provided in the assignment specification. 
-
-## Do you use any additional contract functions? If so, what is the purpose of each function? (no more than 200 words):
-Yes. One additional internal helper function, _executeTrade(), was introduced to improve code organisation and reduce duplication. Both buyEnergyFrom() and sellEnergyTo() perform the same core actions: validating that the buyer and seller are registered prosumers, checking that the seller has sufficient surplus energy and the buyer has sufficient deficit and deposited balance, transferring the payment between accounts, and updating the energy status of both parties. Instead of repeating this logic in both functions, the _executeTrade() function performs the common settlement and validation steps. The two public trading functions simply call this helper with the appropriate buyer and seller addresses.
-
-Using an internal function improves maintainability and readability of the contract. If the trade logic needs to be modified, the change only needs to be made in one place rather than duplicated across multiple functions. This approach also reduces the likelihood of inconsistencies or errors between the buy and sell implementations.
-Not strictly functions but a number of events were introduced to track the key transactions in the coordinated trading process.
-
-    event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
-    event ProsumerRegistered(address indexed prosumer);
-    event Deposit(address indexed prosumer, uint256 amount);
-    event Withdraw(address indexed prosumer, uint256 amount);
-    event EnergyStatusUpdated(address indexed prosumer,int256 deltaEnergy,int256 newEnergyStatus);
-    event EnergyTraded(address indexed seller,address indexed buyer,uint256 energyAmount,uint256 unitPrice,uint256 totalCost);
-
-Plus three modifiers to save repeating the same reqquire statements in a number of functions
+Plus three modifiers were used to save repeating the same require statements in a number of functions
     modifier onlyRecorder() {
         require(msg.sender == recorder, "Only recorder allowed");
         _;
@@ -83,7 +53,7 @@ Plus three modifiers to save repeating the same reqquire statements in a number 
 We implmeneted a battery of unit tests as well as integration testing for the coordinatin mechanism.
 
 ### Unit Tests
-Below we list out ht eadditonal unit tests we added.
+Below we list out the additional unit tests we added.
 
 #### registerProsumer() Test
 - Check that registered prosumer cannot register again
@@ -129,14 +99,14 @@ Below we list out ht eadditonal unit tests we added.
 - Equal negative, equal positive, all zero after coordinatoin
 - More surplus than deficit
 - More deficit than surplurs
-- Checl optimal low variance after coordination
+- Check optimal low variance after coordination
     -   before = [-2, 4, 4, 0, 0], after = [0, 3, 3, 0, 0]
 
 ### Integration Testing
 For integration teting we used the [Open Power System Data household dataset](https://www.kaggle.com/datasets/youssefboutaleb/ausgrid-2024?resource=download)
 We wrote a Python/Pandas script to extract net household energy (generated - consumed) data for 6 households for 23 time periods, from 7:00 to 18:00 in 30 minute intervals.  6 households were chosen to make hand calculation of expected values more manageable and less error prone.
 
-The energy measurements in the datawset are in floating point kWh values but the contract assumes  energy in integer "units". We used a floor method to oconvert the floating point values to integers.
+The energy measurements in the datawset are in floating point kWh values but the contract assumes  energy in integer "units". We used a floor method to convert the floating point values to integers.
 Below is a sample output of processing the dataset:
 ```
 Time 11:30
@@ -149,7 +119,7 @@ Time 12:30
 net_each_household = [2, -3, 1, 1, 1, -2]
 ```
 
-We use this data to create a simulationn of the trading, in the following loop over the time periods, starting with a net energy of 0.
+We use this data to create a simulation of the trading, in the following loop over the time periods, starting with a net energy of 0.
 1. Update net energy of each household using data from the dataset.
 2. Find expected final energy sates after coordiation by hand
 3. Call coordinateTrading function

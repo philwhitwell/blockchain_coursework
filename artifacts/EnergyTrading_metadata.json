@@ -30,138 +30,6 @@
 				"type": "event"
 			},
 			{
-				"anonymous": false,
-				"inputs": [
-					{
-						"indexed": true,
-						"internalType": "address",
-						"name": "prosumer",
-						"type": "address"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "amount",
-						"type": "uint256"
-					}
-				],
-				"name": "Deposit",
-				"type": "event"
-			},
-			{
-				"anonymous": false,
-				"inputs": [
-					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "newPrice",
-						"type": "uint256"
-					},
-					{
-						"indexed": false,
-						"internalType": "int256",
-						"name": "totalEnergyStatus",
-						"type": "int256"
-					}
-				],
-				"name": "EnergyPriceUpdated",
-				"type": "event"
-			},
-			{
-				"anonymous": false,
-				"inputs": [
-					{
-						"indexed": true,
-						"internalType": "address",
-						"name": "prosumer",
-						"type": "address"
-					},
-					{
-						"indexed": false,
-						"internalType": "int256",
-						"name": "deltaEnergy",
-						"type": "int256"
-					},
-					{
-						"indexed": false,
-						"internalType": "int256",
-						"name": "newEnergyStatus",
-						"type": "int256"
-					}
-				],
-				"name": "EnergyStatusUpdated",
-				"type": "event"
-			},
-			{
-				"anonymous": false,
-				"inputs": [
-					{
-						"indexed": true,
-						"internalType": "address",
-						"name": "seller",
-						"type": "address"
-					},
-					{
-						"indexed": true,
-						"internalType": "address",
-						"name": "buyer",
-						"type": "address"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "energyAmount",
-						"type": "uint256"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "unitPrice",
-						"type": "uint256"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "totalCost",
-						"type": "uint256"
-					}
-				],
-				"name": "EnergyTraded",
-				"type": "event"
-			},
-			{
-				"anonymous": false,
-				"inputs": [
-					{
-						"indexed": true,
-						"internalType": "address",
-						"name": "prosumer",
-						"type": "address"
-					}
-				],
-				"name": "ProsumerRegistered",
-				"type": "event"
-			},
-			{
-				"anonymous": false,
-				"inputs": [
-					{
-						"indexed": true,
-						"internalType": "address",
-						"name": "prosumer",
-						"type": "address"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "amount",
-						"type": "uint256"
-					}
-				],
-				"name": "Withdraw",
-				"type": "event"
-			},
-			{
 				"inputs": [
 					{
 						"internalType": "address",
@@ -364,11 +232,11 @@
 	},
 	"sources": {
 		"contracts/EnergyTrading.sol": {
-			"keccak256": "0xe731c2788e3a0a8706cad1900aa1961d17442acf5c542c3f0be5c58e6334997a",
+			"keccak256": "0x4a7c19e966105a222c9f9c0debfe00b45e7d102450e253de48e1e5c4d2f22311",
 			"license": "GPL-3.0",
 			"urls": [
-				"bzz-raw://b0330fe6456b9a7d02de378c288c9bbfd7338b1a78a7f2a5b3ac4780a8b9f837",
-				"dweb:/ipfs/QmZ2wPSSsQFyKqsLyEpWTMcd1maDComBQJJE59DV111sfN"
+				"bzz-raw://2c9aa154a5c0dcf45564e8c2cc1085b31d3c8d0f252f75dd959a7d075e8f1f56",
+				"dweb:/ipfs/QmVUx87JN3WcN1KN3AFKBwYSbF5DXbxfMMbKvGPUPEHLgW"
 			]
 		}
 	},
