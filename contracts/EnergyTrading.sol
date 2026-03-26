@@ -230,7 +230,7 @@ contract EnergyTrading {
         _executeTrade(msg.sender, _buyer, _offeredEnergy);
     }
 
-    function coordinateTrading() public onlyRecorder {
+       function coordinateTrading() public onlyRecorder {
         // First loop through all the prosumers and create an array of buyers and of sellers
         // Then sort sellers and buyers from biggest deficit and surplus to smallest
         // Then loop until all trades completed
@@ -242,29 +242,40 @@ contract EnergyTrading {
         uint256[] memory sellerAmt = new uint256[](n);
         uint256 sellersCount = 0;
 
+        // Amount of units to be sold by sellers.abi
+        // Used to batch updates for sellers rather than writing
+        // constantly to blockchain state.
+        uint256[] memory sellerTradeUnits = new uint256[](n);
+
         address[] memory buyers = new address[](n);
         uint256[] memory buyerAmt = new uint256[](n);
         uint256 buyersCount = 0;
 
-        for (uint256 i = 0; i < n; i++) {
+        // Amount of units to be sold by sellers.abi
+        // Used to batch updates for sellers rather than writing
+        // constantly to blockchain state.
+        uint256[] memory buyerTradeUnits = new uint256[](n);
+
+        for (uint256 i = 0; i < n; ++i) {
             address a = prosumerAddresses[i];
             int256 e = prosumers[a].prosumerEnergyStat;
 
             if (e > 0) {
                 sellers[sellersCount] = a;
                 sellerAmt[sellersCount] = uint256(e);
-                sellersCount++;
+                ++sellersCount;
             } else if (e < 0) {
                 buyers[buyersCount] = a;
-                buyerAmt[buyersCount] = uint256(-e);
-                buyersCount++;
+                // TODO: casting negative to unsigned, dangerous?
+                buyerAmt[buyersCount] = uint256(-e); 
+                ++buyersCount;
             }
         }
 
         // Sort sellers by surplus big to little
-        for (uint256 i = 0; i + 1 < sellersCount; i++) {
+        for (uint256 i = 0; i + 1 < sellersCount; ++i) {
             uint256 maxIdx = i;
-            for (uint256 j = i + 1; j < sellersCount; j++) {
+            for (uint256 j = i + 1; j < sellersCount; ++j) {
                 if (sellerAmt[j] > sellerAmt[maxIdx]) maxIdx = j;
             }
             if (maxIdx != i) {
@@ -274,9 +285,9 @@ contract EnergyTrading {
         }
 
         // Sort buyers by deficit big to little
-        for (uint256 i = 0; i + 1 < buyersCount; i++) {
+        for (uint256 i = 0; i + 1 < buyersCount; ++i) {
             uint256 maxIdx = i;
-            for (uint256 j = i + 1; j < buyersCount; j++) {
+            for (uint256 j = i + 1; j < buyersCount; ++j) {
                 if (buyerAmt[j] > buyerAmt[maxIdx]) maxIdx = j;
             }
             if (maxIdx != i) {
@@ -299,13 +310,18 @@ contract EnergyTrading {
         // This gives:
         // [1,1,1,-5,0,-4] -> [0,0,0,-3,0,-3]
         // [8,-1,7,7,6,-1] -> [6,0,7,7,6,0]
+
+        // Optimizaiton: prevent reading from blockchain state in loop.
+        // Read once and cache.
+        uint256 currentPrice = energyPrice; // 1 unit per step
+
         while (true) {
             uint256 maxBuyerIdx = type(uint256).max;
             uint256 maxDeficit = 0;
 
             // Find buyer with largest remaining deficit
             // IMPORTANT: use ">" not ">=" so ties keep the first buyer found
-            for (uint256 bi = 0; bi < buyersCount; bi++) {
+            for (uint256 bi = 0; bi < buyersCount; ++bi) {
                 if (buyerAmt[bi] > maxDeficit) {
                     maxDeficit = buyerAmt[bi];
                     maxBuyerIdx = bi;
@@ -317,7 +333,7 @@ contract EnergyTrading {
 
             // Find seller with largest remaining surplus
             // IMPORTANT: use ">" not ">=" so ties keep the first seller found
-            for (uint256 si = 0; si < sellersCount; si++) {
+            for (uint256 si = 0; si < sellersCount; ++si) {
                 if (sellerAmt[si] > maxSurplus) {
                     maxSurplus = sellerAmt[si];
                     maxSellerIdx = si;
@@ -329,26 +345,47 @@ contract EnergyTrading {
                 break;
             }
 
-            address buyer = buyers[maxBuyerIdx];
-            Prosumer storage buyerP = prosumers[buyer];
+            ++buyerTradeUnits[maxBuyerIdx];
+            ++sellerTradeUnits[maxSellerIdx];
 
-            address seller = sellers[maxSellerIdx];
-            Prosumer storage sellerP = prosumers[seller];
+            // address buyer = buyers[maxBuyerIdx];
+            // Prosumer storage buyerP = prosumers[buyer];
 
-            uint256 cost = energyPrice; // 1 unit per step
+            // address seller = sellers[maxSellerIdx];
+            // Prosumer storage sellerP = prosumers[seller];
 
-            // The brief allows us to assume buyers have enough Ether
-            require(buyerP.prosumerBalance >= cost, "Buyer has insufficient balance");
+            // // The brief allows us to assume buyers have enough Ether
+            // require(buyerP.prosumerBalance >= cost, "Buyer has insufficient balance");
 
-            buyerP.prosumerBalance -= cost;
-            sellerP.prosumerBalance += cost;
+            //buyerP.prosumerBalance -= cost;
+            //sellerP.prosumerBalance += cost;
 
-            buyerP.prosumerEnergyStat += 1;
-            sellerP.prosumerEnergyStat -= 1;
+            // ++buyerP.prosumerEnergyStat;
+            // --sellerP.prosumerEnergyStat;
 
-            buyerAmt[maxBuyerIdx] -= 1;
-            sellerAmt[maxSellerIdx] -= 1;
-            totalMatched += 1;
+            --buyerAmt[maxBuyerIdx];
+            --sellerAmt[maxSellerIdx];
+            ++totalMatched;
+        }
+
+        // Now write final amounts to blockchain state
+        //Update buyers
+        for (uint i = 0; i < buyersCount; ++i) {
+            if (buyerTradeUnits[i] > 0) {
+                address buyer = buyers[i];
+                // COULD ADD THE REQUIRE CONDITION HERE.
+                prosumers[buyer].prosumerBalance -= buyerTradeUnits[i] * currentPrice;
+                prosumers[buyer].prosumerEnergyStat += int256(buyerTradeUnits[i]);
+            }
+        }
+
+        // Update sellers.abi
+        for (uint i = 0; i < sellersCount; ++i) {
+            if (sellerTradeUnits[i] > 0) {
+                address seller = sellers[i];
+                prosumers[seller].prosumerBalance += sellerTradeUnits[i] * currentPrice;
+                prosumers[seller].prosumerEnergyStat -= int256(sellerTradeUnits[i]);
+            }
         }
 
         emit CoordinationComplete(totalMatched);
