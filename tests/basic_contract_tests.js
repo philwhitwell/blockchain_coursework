@@ -382,6 +382,65 @@ describe("buyEnergyFrom() unit tests", function () {
     });
 });
 
+describe("updateEnergyPrice() unit testss", function () {
+    let EnergyTrading, contract, recorder, prosumer1, prosumer2, prosumer3;
+    const ETHER = ethers.parseEther("1");
+
+    beforeEach(async function () {
+        [recorder, prosumer1, prosumer2, prosumer3] = await ethers.getSigners();
+        EnergyTrading = await ethers.getContractFactory(contractName);
+        contract = await EnergyTrading.deploy(recorder.address);
+        await contract.connect(recorder).registerProsumer();
+        await contract.connect(prosumer1).registerProsumer();
+        await contract.connect(prosumer2).registerProsumer();
+        await contract.connect(prosumer3).registerProsumer();
+    });
+
+    it("Base Price at net 0", async function () {
+        await contract.connect(recorder).updateEnergyPrice();
+        const updatedPrice = await contract.connect(recorder).getEnergyPrice();
+        expect(updatedPrice).to.equal(ETHER);
+    });
+
+    it("Very high deficit, max price", async function () {
+        await contract.connect(recorder).updateEnergyStatus(prosumer1.address, -3000);
+        await contract.connect(recorder).updateEnergyStatus(prosumer2.address, -5000);
+        await contract.connect(recorder).updateEnergyStatus(prosumer3.address, -3000);
+        await contract.connect(recorder).updateEnergyPrice();
+        const updatedPrice = await contract.connect(recorder).getEnergyPrice();
+        expect(updatedPrice).to.equal(5n * ETHER);
+    });
+
+    it("Very high surplus, minimum price", async function () {
+        await contract.connect(recorder).updateEnergyStatus(prosumer1.address, 450);
+        await contract.connect(recorder).updateEnergyStatus(prosumer2.address, 350);
+        await contract.connect(recorder).updateEnergyStatus(prosumer3.address, 100);
+        await contract.connect(recorder).updateEnergyPrice();
+        const updatedPrice = await contract.connect(recorder).getEnergyPrice();
+        expect(updatedPrice).to.equal(ethers.parseEther("0.1"));
+    });
+
+    it("High defciit, increased price", async function () {
+        await contract.connect(recorder).updateEnergyStatus(recorder.address, -250);
+        await contract.connect(recorder).updateEnergyStatus(prosumer1.address, -1000);
+        await contract.connect(recorder).updateEnergyStatus(prosumer2.address, -1000);
+        await contract.connect(recorder).updateEnergyStatus(prosumer3.address, -250);
+        await contract.connect(recorder).updateEnergyPrice();
+        const updatedPrice = await contract.connect(recorder).getEnergyPrice();
+        expect(updatedPrice).to.equal(ethers.parseEther("3.5"));
+    });
+
+    it("Surplus, decreased price", async function () {
+        await contract.connect(recorder).updateEnergyStatus(recorder.address, 50);
+        await contract.connect(recorder).updateEnergyStatus(prosumer1.address, 100);
+        await contract.connect(recorder).updateEnergyStatus(prosumer2.address, 100);
+        await contract.connect(recorder).updateEnergyStatus(prosumer3.address, 200);
+        await contract.connect(recorder).updateEnergyPrice();
+        const updatedPrice = await contract.connect(recorder).getEnergyPrice();
+        expect(updatedPrice).to.equal(ethers.parseEther("0.55"));
+    });
+});
+
 describe("withdraw() unit tests", function () {
     let EnergyTrading, contract, recorder, prosumer1, prosumer2, prosumer3;
 
