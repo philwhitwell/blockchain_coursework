@@ -87,7 +87,7 @@ Below we list out the additional unit tests we added.
 - Very high net deficit, maximum price limit
 - Hight net surplus, decreased price
 - Hight net deficit, increased price
-- Net 0 deficit, base price
+- Net 0 deficit/surplus, base price
 
 #### withdraw() Tests
 - Withdraw when energy surplus and sufficient balance
