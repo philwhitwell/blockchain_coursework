@@ -24,53 +24,6 @@ Yes. One additional internal helper function, _executeTrade(), was introduced to
 
 Using an internal function improves maintainability and readability of the contract. If the trade logic needs to be modified, the change only needs to be made in one place rather than duplicated across multiple functions. This approach also reduces the likelihood of inconsistencies or errors between the buy and sell implementations.
 Not strictly functions but a number of events were introduced to track the key transactions in the contract. 
-These were commented out in the final contract to improve performace.
-    event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
-    event ProsumerRegistered(address indexed prosumer);
-    event Deposit(address indexed prosumer, uint256 amount);
-    event Withdraw(address indexed prosumer, uint256 amount);
-    event EnergyStatusUpdated(address indexed prosumer,int256 deltaEnergy,int256 newEnergyStatus);
-    event EnergyTraded(address indexed seller,address indexed buyer,uint256 energyAmount,uint256 unitPrice,uint256 totalCost);
-
-Plus three modifiers were used to save repeating the same require statements in a number of functions
-    modifier onlyRecorder() {
-        require(msg.sender == recorder, "Only recorder allowed");
-        _;
-    }
-    modifier isMember(){
-        require(prosumers[msg.sender].isMember, "Prosumer not registered");
-        _;
-    }
-    modifier isRegistered(address prosumerAddr) {
-        require(prosumers[prosumerAddr].isMember, "Prosumer not registered");
-        _;
-
-Your name:Philip Whitwell 
-Your student ID: khzp0421
-
-Your teammate's name: Mustafa Adaoglu
-Your teammate's student ID: sc20m2a
-
-## Description of the proposed coordination mechanism implemented in the coordinatedTrading() function (no more than 200 words):
-The coordinateTrading() function redistributes surplus energy among prosumers in discrete steps. It first iterates through all registered prosumers, separating them into sellers (positive energy) and buyers (negative energy). Temporary memory arrays are used to store their addresses and corresponding surplus or deficit values, as memory is cheaper than storage for short-lived data.
-Both groups are then sorted in descending order, prioritising the largest surpluses and deficits. The algorithm proceeds iteratively: in each step, the largest seller and largest buyer are matched, and one unit of energy is transferred. This updates both energy balances and transfers the corresponding payment.
-The process continues until no surplus or deficit remains on either side. The total number of trades is tracked, and a CoordinationComplete event is emitted upon completion.
-Test cases such as [1,1,1,-5,0,-4] → [0,0,0,-3,0,-3] and [8,-1,7,7,6,-1] → [6,0,7,7,6,0] were used to validate sorting and matching. Attempts to optimise by trading multiple units at once reduced correctness or increased gas usage, so a unit-step approach was retained.
-To reduce gas costs, trades are accumulated in memory and written to blockchain state only once per participant at the end, minimising expensive storage operations while preserving correct energy and balance updates.
-
-
-
-## Do you use any additional contract variables? If so, what is the purpose of each variable? (no more than 200 words):
-An additional contract variable prosumerAddresses (an array of addresses) was introduced because Solidity mappings are not iterable. While the prosumers mapping stores the data associated with each prosumer, it is not possible to loop through all keys in a mapping. The prosumerAddresses array stores the address of every registered prosumer when they call registerProsumer(). This allows the contract to iterate over all participants when performing operations that require knowledge of the entire community, such as calculating the total community energy status in updateEnergyPrice() and identifying buyers and sellers during the coordinateTrading() process.
-
-## Do you use any additional data structures (structs)? If so, what is the purpose of each structure? (no more than 200 words):
-No additional structs were introduced in this implementation. The contract uses the Prosumer struct that was provided in the assignment specification. 
-
-## Do you use any additional contract functions? If so, what is the purpose of each function? (no more than 200 words):
-Yes. One additional internal helper function, _executeTrade(), was introduced to improve code organisation and reduce duplication. Both buyEnergyFrom() and sellEnergyTo() perform the same core actions: validating that the buyer and seller are registered prosumers, checking that the seller has sufficient surplus energy and the buyer has sufficient deficit and deposited balance, transferring the payment between accounts, and updating the energy status of both parties. Instead of repeating this logic in both functions, the _executeTrade() function performs the common settlement and validation steps. The two public trading functions simply call this helper with the appropriate buyer and seller addresses.
-
-Using an internal function improves maintainability and readability of the contract. If the trade logic needs to be modified, the change only needs to be made in one place rather than duplicated across multiple functions. This approach also reduces the likelihood of inconsistencies or errors between the buy and sell implementations.
-Not strictly functions but a number of events were introduced to track the key transactions in the contract. 
 These were commented out in the final contract to improve performance.
   ```  
     event EnergyPriceUpdated(uint256 newPrice, int256 totalEnergyStatus);
