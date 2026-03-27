@@ -82,6 +82,13 @@ Below we list out the additional unit tests we added.
 - Cannot request to buy 0 energy
 - Don't allow buying more than balance
 
+#### updateEnergyPrice() tests
+- Very high net surplus, minimum price limit
+- Very high net deficit, maximum price limit
+- Hight net surplus, decreased price
+- Hight net deficit, increased price
+- Net 0 deficit, base price
+
 #### withdraw() Tests
 - Withdraw when energy surplus and sufficient balance
 - Withdraw when net 0, sufficient balance
