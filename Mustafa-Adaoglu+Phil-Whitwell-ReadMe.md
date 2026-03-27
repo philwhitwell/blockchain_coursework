@@ -151,6 +151,8 @@ Below we list out the additional unit tests we added.
 
 ### Integration Testing
 For integration testing we used the [Open Power System Data household dataset](https://www.kaggle.com/datasets/youssefboutaleb/ausgrid-2024?resource=download)
+
+#### Coordination Tests
 We wrote a Python/Pandas script to extract net household energy (generated - consumed) data for 6 households for 23 time periods, from 7:00 to 18:00 in 30 minute intervals.  6 households were chosen to make hand calculation of expected values more manageable and less error-prone.
 
 The energy measurements in the dataset are in floating point kWh values, but the contract assumes energy in integer "units". We used a floor method to convert the floating point values to integers.
@@ -166,96 +168,14 @@ Time 12:30
 net_each_household = [2, -3, 1, 1, 1, -2]
 ```
 
-We use this data to create a simulation of the trading, in the following loop over the time periods, starting with a net energy of 0.
+We use this data to create a simulation of the trading, in the following loop over the time periods, starting with a net energy of 0. The expected states after coordination are worked out in advance by hand.
 1. Update net energy of each household using data from the dataset.
-2. Find expected final energy sates after coordination by hand
-3. Call coordinateTrading function
-4. Assert that the actual value is equal to expected.
+2. Call coordinateTrading function
+3. Assert that the actual value is equal to expected.
 
-We perform the simulation to verify correct energy price updates as well.
-It is assumed that the final system will call the updateEnergyPrice() function to update the energy price separately from the coordinatedTrading() function.
-
-
-
-
-
-## Did you implement any additional test cases to test your smart contract? If so, what are these tests?
-We implemented a battery of unit tests as well as integration testing for the coordination mechanism.
-
-### Unit Tests
-Below we list out the additional unit tests we added.
-
-#### registerProsumer() Test
-- Check that registered prosumer cannot register again
-
-#### sellEnergyTo() Tests
-- Valid selling transaction
-- Cannot sell to buyer with insufficient balance
-- Don't allow sell to self
-- Don't allow unregistered user to sell
-- Don't allow registered user to sell to unregistered user
-- Cannot sell 0 energy
-- Don't allow seller with no surplus to sell
-- Don't sell to buyer in suprlus or not in deficit
-- Seller cannot oversell
-
-#### buyEnergyFrom() Tests
-- Registered prosumer with sufficient balance should be able to buy form registered user in surplus
-- Registered prosumer with sufficient balance should be able to buy exactly their deficit
-- Don't allow user with surplus to buy
-- Don't allow user with net 0 to buy
-- Don't allow buy from user with no surplus
-- Don't allow buying more than the seller has
-- Don't allow buying more than deficit
-- Don't allow unregistered user to buy
-- Don't allow registered user to buy from unregistered user
-- Don't allow buy from self
-- Cannot request to buy 0 energy
-- Don't allow buying more than balance
-
-#### withdraw() Tests
-- Withdraw when energy surplus and sufficient balance
-- Withdraw when net 0, sufficient balance
-- Don't allow unregistered account to withdraw
-- Don't allow attempt to withdraw 0
-- Don't allow attempt to withdraw with energy deficit
-- Don't allow attempt to withdraw with insufficient blaance
-
-#### coordinateTrading() tests
-- Test case/data from brief
-- Coordination when all net zero
-- No surplus, all deficit
-- No deficit, all surplus
-- Equal negative, equal positive, all zero after coordination
-- More surplus than deficit
-- More deficit than surplus
-- Check optimal low variance after coordination
-    -   before = [-2, 4, 4, 0, 0], after = [0, 3, 3, 0, 0]
-
-### Integration Testing
-For integration testing we used the [Open Power System Data household dataset](https://www.kaggle.com/datasets/youssefboutaleb/ausgrid-2024?resource=download)
-We wrote a Python/Pandas script to extract net household energy (generated - consumed) data for 6 households for 23 time periods, from 7:00 to 18:00 in 30 minute intervals.  6 households were chosen to make hand calculation of expected values more manageable and less error-prone.
-
-The energy measurements in the dataset are in floating point kWh values, but the contract assumes energy in integer "units". We used a floor method to convert the floating point values to integers.
-Below is a sample output of processing the dataset:
-```
-Time 11:30
-net_each_household = [2, 1, 1, 1, 1, -1]
-----------------------------------------
-Time 12:00
-net_each_household = [2, -2, 1, 1, 1, -2]
-----------------------------------------
-Time 12:30
-net_each_household = [2, -3, 1, 1, 1, -2]
-```
-
-We use this data to create a simulation of the trading, in the following loop over the time periods, starting with a net energy of 0.
+#### Update Energy Price tests
+Similar to the coordination tests, we use the dataset to get sample net household energy values. For this test, we use Wh instead of kWh to get a wider "spread" of energy price changes.
+We use this data to test the updateEnergyPrice function, in the following loop over the time periods, starting with a net energy of 0. The expected energy prices are worked out in advance by hand.
 1. Update net energy of each household using data from the dataset.
-2. Find expected final energy sates after coordination by hand
-3. Call coordinateTrading function
-4. Assert that the actual value is equal to expected.
-
-We perform the simulation to verify correct energy price updates as well.
-It is assumed that the final system will call the updateEnergyPrice() function to update the energy price separately from the coordinatedTrading() function.
-
-
+2. Call updateEnergyPrice function
+3. Assert that the actual value is equal to expected.
